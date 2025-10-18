@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type LockerSize = 'small' | 'medium' | 'large';
@@ -61,6 +62,13 @@ export default function LockerSimulation() {
   const [openLockerId, setOpenLockerId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const [lockerAnimations, setLockerAnimations] = useState<
+    Record<number, LockerAnimation>
+  >({});
+  const animationTimeoutsRef = useRef<Record<number, number>>({});
+  const [manualPackageLockers, setManualPackageLockers] = useState<
+    Record<number, boolean>
+  >({});
 
   const fetchLockers = useCallback(async () => {
     try {
@@ -79,6 +87,14 @@ export default function LockerSimulation() {
   useEffect(() => {
     fetchLockers();
   }, [fetchLockers]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(animationTimeoutsRef.current).forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+    };
+  }, []);
 
   const availableStats = useMemo(() => {
     const total = lockers.length;
@@ -121,6 +137,32 @@ export default function LockerSimulation() {
     oscillator.stop(context.currentTime + 0.6);
   }, [ensureAudioContext]);
 
+  const triggerPackageAnimation = useCallback((lockerId: number) => {
+      const key = Date.now() + Math.random();
+      setLockerAnimations((prev) => ({
+        ...prev,
+        [lockerId]: { direction: 'incoming', key },
+      }));
+      if (animationTimeoutsRef.current[lockerId]) {
+        window.clearTimeout(animationTimeoutsRef.current[lockerId]);
+      }
+      const duration = 1100;
+      animationTimeoutsRef.current[lockerId] = window.setTimeout(() => {
+        setLockerAnimations((prev) => {
+          const current = prev[lockerId];
+          if (!current || current.key !== key) {
+            return prev;
+          }
+          const copy = { ...prev };
+          delete copy[lockerId];
+          return copy;
+        });
+        delete animationTimeoutsRef.current[lockerId];
+      }, duration);
+    },
+    [],
+  );
+
   const handleCourierSubmit = async () => {
     setLoading(true);
     setError(null);
@@ -150,6 +192,7 @@ export default function LockerSimulation() {
       });
       setMessage(data.instructions);
       setOpenLockerId(data.locker.id);
+      triggerPackageAnimation(data.locker.id);
       await fetchLockers();
       await playChime();
     } catch (err) {
@@ -192,6 +235,10 @@ export default function LockerSimulation() {
       });
       setMessage(data.message);
       setOpenLockerId(data.locker.id);
+      setManualPackageLockers((prev) => ({
+        ...prev,
+        [data.locker.id]: true,
+      }));
       setPickupInput('');
       await fetchLockers();
       await playChime();
@@ -210,9 +257,34 @@ export default function LockerSimulation() {
     setOpenLockerId(null);
     setMessage(null);
     setError(null);
+    Object.values(animationTimeoutsRef.current).forEach((timerId) =>
+      window.clearTimeout(timerId),
+    );
+    animationTimeoutsRef.current = {};
+    setLockerAnimations({});
+    setManualPackageLockers({});
   };
 
   const handleDoorClosed = async () => {
+    const closingLockerId = openLockerId;
+    if (closingLockerId != null) {
+      if (animationTimeoutsRef.current[closingLockerId]) {
+        window.clearTimeout(animationTimeoutsRef.current[closingLockerId]);
+        delete animationTimeoutsRef.current[closingLockerId];
+      }
+      setLockerAnimations((prev) => {
+        if (!prev[closingLockerId]) return prev;
+        const copy = { ...prev };
+        delete copy[closingLockerId];
+        return copy;
+      });
+      setManualPackageLockers((prev) => {
+        if (!prev[closingLockerId]) return prev;
+        const copy = { ...prev };
+        delete copy[closingLockerId];
+        return copy;
+      });
+    }
     setOpenLockerId(null);
     setMessage('柜门已关闭，欢迎再次使用！');
     setTimeout(() => {
@@ -224,13 +296,13 @@ export default function LockerSimulation() {
   const keypadNumbers = useMemo(() => ['1', '2', '3', '4', '5', '6', '7', '8', '9', '清空', '0', '删除'], []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-100 via-emerald-50 to-emerald-100 flex flex-col items-center py-8 px-4">
-      <h1 className="text-3xl md:text-4xl font-bold text-emerald-700 mb-6">
+    <div className="min-h-screen bg-gradient-to-b from-sky-100 via-emerald-50 to-emerald-100 flex flex-col items-center py-6 px-4">
+      <h1 className="text-2xl md:text-3xl font-bold text-emerald-700 mb-4">
         信息科技小课堂快递柜体验系统 V1.0
       </h1>
 
       <div className="w-full max-w-6xl bg-emerald-200 rounded-3xl shadow-2xl border-4 border-emerald-400 overflow-hidden">
-        <div className="bg-sky-300 text-center py-4 text-2xl font-semibold tracking-[.4em] text-emerald-900">
+        <div className="bg-sky-300 text-center py-2 md:py-3 text-xl md:text-2xl font-semibold tracking-[.3em] text-emerald-900">
           快递柜
         </div>
 
@@ -239,6 +311,8 @@ export default function LockerSimulation() {
             <LockerGrid
               lockers={lockers}
               openLockerId={openLockerId}
+              lockerAnimations={lockerAnimations}
+              manualPackageLockers={manualPackageLockers}
               onSelectLocker={(lockerId) => {
                 const locker = lockers.find((item) => item.id === lockerId);
                 if (locker) {
@@ -487,19 +561,19 @@ function ScreenContent(props: {
         <h2 className="text-lg font-semibold text-amber-200">
           请输入 6 位取件码
         </h2>
-        <div className="bg-slate-800 rounded-xl py-3 px-4 text-2xl tracking-[0.4em] text-center font-mono">
+        <div className="bg-slate-800 rounded-xl py-2.5 px-4 text-xl tracking-[0.35em] text-center font-mono">
           {pickupInput.padEnd(6, '•')}
         </div>
-        <div className="grid flex-1 grid-cols-3 gap-2">
+        <div className="grid flex-1 grid-cols-3 gap-1.5">
           {keypadNumbers.map((value) => (
             <button
               key={value}
-              className={`rounded-lg py-2 text-lg font-semibold transition-colors ${
+              className={`rounded-lg py-1.5 text-base font-semibold transition-colors ${
                 value === '清空'
-                  ? 'bg-slate-700 hover:bg-slate-600'
+                  ? 'bg-slate-700 hover:bg-slate-600 text-sm'
                   : value === '删除'
-                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-900'
-                    : 'bg-slate-800 hover:bg-slate-700'
+                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-900 text-sm'
+                    : 'bg-slate-800 hover:bg-slate-700 text-lg'
               }`}
               onClick={() => onKeypadClick(value)}
             >
@@ -509,13 +583,13 @@ function ScreenContent(props: {
         </div>
         <div className="mt-auto flex gap-2">
           <button
-            className="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-2 font-semibold"
+            className="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-1.5 font-semibold text-sm"
             onClick={onBackHome}
           >
             返回首页
           </button>
           <button
-            className="flex-1 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-lg py-2 font-semibold"
+            className="flex-1 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-lg py-1.5 font-semibold text-sm"
             onClick={onPickupConfirm}
           >
             打开柜门
@@ -563,10 +637,14 @@ function ScreenContent(props: {
 function LockerGrid({
   lockers,
   openLockerId,
+  lockerAnimations,
+  manualPackageLockers,
   onSelectLocker,
 }: {
   lockers: Locker[];
   openLockerId: number | null;
+  lockerAnimations: Record<number, LockerAnimation>;
+  manualPackageLockers: Record<number, boolean>;
   onSelectLocker: (lockerId: number) => void;
 }) {
   if (!lockers.length) {
@@ -581,7 +659,31 @@ function LockerGrid({
     <div className="grid grid-cols-6 grid-rows-4 gap-2 md:gap-3 h-full">
       {lockers.map((locker) => {
         const isOpen = openLockerId === locker.id;
-        const isOccupied = locker.status === 'occupied';
+        const hasStoredPackage = locker.status === 'occupied';
+        const animation = lockerAnimations[locker.id];
+        const manualPackage = manualPackageLockers[locker.id] ?? false;
+        const showActivePackage =
+          isOpen && (hasStoredPackage || Boolean(animation) || manualPackage);
+        const packageAnimationClass = animation ? 'animate-package-in' : '';
+        const packageKey =
+          animation?.key ??
+          (manualPackage ? `manual-${locker.id}` : hasStoredPackage ? 'stored' : 'empty');
+        const interiorScale = INTERIOR_SCALE[locker.size];
+        const interiorStyle: CSSProperties = {
+          width: `${interiorScale * 100}%`,
+          height: `${interiorScale * 100}%`,
+        };
+        const packageWidthScale = PACKAGE_SCALE[locker.size];
+        const packageHeightScale = PACKAGE_SCALE[locker.size] * 0.72;
+        const packageStyle: CSSProperties = {
+          width: `${packageWidthScale * 100}%`,
+          height: `${packageHeightScale * 100}%`,
+        };
+        const doorBackground =
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(226, 255, 244, 0.7))';
+        const doorShadow = '0 3px 8px rgba(0, 0, 0, 0.12)';
+        const packageOverlayOpacity = isOpen ? 1 : 0.5;
+
         return (
           <button
             key={locker.id}
