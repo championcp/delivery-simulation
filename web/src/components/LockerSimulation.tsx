@@ -31,6 +31,12 @@ const SIZE_OPTIONS: { value: LockerSize; label: string; hint: string }[] = [
   { value: 'large', label: '大格', hint: '适合体积较大的包裹' },
 ];
 
+const DOOR_SIZE_CLASS: Record<LockerSize, string> = {
+  small: 'w-[58%] h-[58%]',
+  medium: 'w-[74%] h-[74%]',
+  large: 'w-[92%] h-[88%]',
+};
+
 interface CourierFormState {
   recipientName: string;
   recipientPhone: string;
@@ -582,13 +588,21 @@ function LockerGrid({
             className="relative rounded-lg border-2 border-emerald-600 bg-emerald-300 focus:outline-none focus:ring-4 focus:ring-emerald-400/60 overflow-hidden transition-transform hover:scale-[1.01]"
             onClick={() => onSelectLocker(locker.id)}
           >
-            <div
-              className="absolute inset-0 origin-left transition-transform duration-500 ease-in-out"
-              style={{
-                transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
-                backgroundColor: isOccupied ? '#7ed957' : '#b9f2a1',
-              }}
-            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className={`relative rounded-md border border-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-200 shadow-inner transition-all duration-500 ease-in-out ${DOOR_SIZE_CLASS[locker.size]}`}
+              >
+                <div
+                  className="absolute inset-0 rounded-md origin-left transition-transform duration-500 ease-in-out"
+                  style={{
+                    transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
+                    backgroundColor: isOccupied ? '#7ed957' : '#b9f2a1',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.15)',
+                  }}
+                />
+                <div className="absolute inset-0 rounded-md pointer-events-none border border-emerald-500/60" />
+              </div>
+            </div>
             <div className="relative z-10 h-full w-full flex flex-col justify-between p-1 text-left text-emerald-900">
               <span className="text-[10px] font-semibold opacity-80">
                 {locker.label}
