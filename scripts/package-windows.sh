@@ -51,11 +51,11 @@ echo "==> Creating Windows start script"
 cat <<'BAT' > "${DIST_DIR}/start.bat"
 @echo off
 setlocal
-set APP_DIR=%~dp0web
-set NODE_DIR=%~dp0node
-set NPM_CLI=%NODE_DIR%\node_modules\npm\bin\npm-cli.js
+set "APP_DIR=%~dp0web"
+set "NODE_DIR=%~dp0node"
+set "NPM_CLI=%NODE_DIR%\node_modules\npm\bin\npm-cli.js"
 if not exist "%NPM_CLI%" (
-  echo 未找到 npm-cli.js，請確認壓縮包是否完整。
+  echo 未找到 npm-cli.js，請確認壓縮包是否完整後重試。
   pause
   exit /b 1
 )
