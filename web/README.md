@@ -117,10 +117,68 @@ npm run dev
 
 ### 7. 常见问题
 
-- **端口被占用**：如果已有其他程序占用 3000 端口，启动时会失败。可在终端运行 `PORT=4000 npm run start`（Windows PowerShell 使用 `$env:PORT=4000; npm run start`）选择其他端口。
-- **安装时网络慢或失败**：确保设备联网；必要时更换网络或稍后再试。
-- **权限提示**：若提示没有权限，尝试以管理员身份运行终端（Windows 右键“以管理员身份运行”）。
+- **端口被占用**：若 3000 端口已被其他应用占用，可通过 `PORT=4000 npm run start`（Windows PowerShell 使用 `$env:PORT=4000; npm run start`）改用其他端口。
+- **网络缓慢或安装失败**：确保设备联网良好，可更换网络后重试。
+- **权限不足**：若提示权限错误，请以管理员身份运行终端（Windows 右键“以管理员身份运行”）。
 
+### 8. 傻瓜式一键部署包（开发人员预制）
+
+为方便完全没有工程背景的老师使用，可由开发人员制作“解压即用”的一键部署包。
+
+#### 开发人员制作步骤
+
+1. 在开发机执行：
+   ```bash
+   cd web
+   npm install
+   npm run build
+   npm prune --omit=dev
+   ```
+   确保 `node_modules` 与 `.next` 已生成。
+2. 下载 Node.js 便携版 ZIP（Windows）或 tar.gz（macOS/Linux），解压至 `bundle/node/`。
+3. 创建目录结构：
+   ```
+   bundle/
+   ├─ node/                # Node 便携版（包含 node.exe 或 bin/node）
+   ├─ web/                 # 本项目目录（包含 .next、node_modules、data 等）
+   ├─ start.bat            # Windows 启动脚本
+   └─ start.command        # macOS 双击脚本（可选）
+   ```
+4. `start.bat` 示例：
+   ```bat
+   @echo off
+   setlocal
+   set APP_DIR=%~dp0web
+   set NODE_DIR=%~dp0node
+   cd /d "%APP_DIR%"
+   if not exist data mkdir data
+   "%NODE_DIR%\node.exe" node_modules\npm\bin\npm-cli.js run start
+   endlocal
+   pause
+   ```
+5. macOS `start.command` 示例：
+   ```bash
+   #!/bin/bash
+   DIR="$(cd "$(dirname "$0")" && pwd)"
+   APP_DIR="$DIR/web"
+   NODE_BIN="$DIR/node/bin/node"
+   mkdir -p "$APP_DIR/data"
+   cd "$APP_DIR"
+   "$NODE_BIN" node_modules/npm/bin/npm-cli.js run start
+   ```
+   保存后运行 `chmod +x start.command`。
+6. 将 `bundle` 目录压缩为 `locker-simulator-win64.zip` 等文件提供给部署者。
+
+> **快速方式**：仓库提供脚本 `./scripts/package-windows.sh` 会自动完成上述步骤，产物位于 `dist/locker-simulator-win64.zip`。  
+> - 默认使用当前 Node.js 版本，可通过 `NODE_VERSION_OVERRIDE=20.17.0 ./scripts/package-windows.sh` 指定 Windows 打包所用的 Node 版本。  
+> - 脚本会为 Windows 创建 `start.bat`，并下载对应的 Node 便携包，无需手动准备。
+
+#### 使用者操作步骤
+
+1. 解压压缩包至任意目录（例如 `C:\locker-simulator`）。
+2. Windows 用户双击 `start.bat`，macOS 用户双击 `start.command`。
+3. 终端窗口提示服务已启动后，访问 [http://localhost:3000](http://localhost:3000) 即可使用。
+4. 使用结束后，在窗口内按 `Ctrl + C` 或关闭窗口。
 ## 操作指南
 
 ### 快递员投件流程
