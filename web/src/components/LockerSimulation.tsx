@@ -31,6 +31,12 @@ const SIZE_OPTIONS: { value: LockerSize; label: string; hint: string }[] = [
   { value: 'large', label: '大格', hint: '适合体积较大的包裹' },
 ];
 
+const DOOR_SIZE_CLASS: Record<LockerSize, string> = {
+  small: 'w-[46%] max-w-[56px]',
+  medium: 'w-[62%] max-w-[68px]',
+  large: 'w-[78%] max-w-[80px]',
+};
+
 interface CourierFormState {
   recipientName: string;
   recipientPhone: string;
@@ -228,8 +234,8 @@ export default function LockerSimulation() {
           快递柜
         </div>
 
-        <div className="flex flex-col md:flex-row md:h-[560px] md:items-stretch">
-          <div className="flex-1 bg-gradient-to-br from-emerald-200 to-lime-200 p-3 md:p-6 md:h-full">
+        <div className="flex flex-col md:flex-row md:min-h-[640px] xl:min-h-[700px] md:items-stretch">
+          <div className="flex-1 bg-gradient-to-br from-emerald-200 to-lime-200 p-3 md:p-6 md:flex md:flex-col">
             <LockerGrid
               lockers={lockers}
               openLockerId={openLockerId}
@@ -242,7 +248,7 @@ export default function LockerSimulation() {
             />
           </div>
 
-          <div className="w-full md:w-[320px] bg-slate-900 text-slate-100 p-5 flex flex-col gap-4 md:h-full">
+          <div className="w-full md:w-[320px] bg-slate-900 text-slate-100 p-5 flex flex-col gap-4 md:min-h-full">
             <ScreenHeader
               availableStats={availableStats}
               isLoading={loading}
@@ -582,24 +588,47 @@ function LockerGrid({
             className="relative rounded-lg border-2 border-emerald-600 bg-emerald-300 focus:outline-none focus:ring-4 focus:ring-emerald-400/60 overflow-hidden transition-transform hover:scale-[1.01]"
             onClick={() => onSelectLocker(locker.id)}
           >
-            <div
-              className="absolute inset-0 origin-left transition-transform duration-500 ease-in-out"
-              style={{
-                transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
-                backgroundColor: isOccupied ? '#7ed957' : '#b9f2a1',
-              }}
-            />
-            <div className="relative z-10 h-full w-full flex flex-col justify-between p-1 text-left text-emerald-900">
-              <span className="text-[10px] font-semibold opacity-80">
-                {locker.label}
-              </span>
-              <span className="text-[10px] font-semibold opacity-80 self-end">
-                {locker.size === 'small'
-                  ? '小格'
-                  : locker.size === 'medium'
-                    ? '中格'
-                    : '大格'}
-              </span>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className={`relative rounded-md border border-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-200 shadow-inner transition-all duration-500 ease-in-out ${DOOR_SIZE_CLASS[locker.size]}`}
+              >
+                <div
+                  className="absolute inset-0 rounded-md origin-left transition-transform duration-500 ease-in-out"
+                  style={{
+                    transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
+                    backgroundColor: isOccupied ? '#7ed957' : '#b9f2a1',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.15)',
+                  }}
+                />
+                <div className="absolute inset-0 rounded-md pointer-events-none border border-emerald-500/60" />
+              </div>
+            </div>
+            <div className="relative z-10 flex h-full w-full flex-col px-1 pb-1 pt-1.5 text-emerald-900">
+              <div className="flex flex-1 items-center justify-center">
+                <div
+                  className={`relative aspect-square ${DOOR_SIZE_CLASS[locker.size]} rounded-md border border-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-200 shadow-inner transition-all duration-500 ease-in-out`}
+                >
+                  <div
+                    className="absolute inset-0 rounded-md origin-left transition-transform duration-500 ease-in-out"
+                    style={{
+                      transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
+                      backgroundColor: isOccupied ? '#7ed957' : '#b9f2a1',
+                      boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.15)',
+                    }}
+                  />
+                  <div className="absolute inset-0 rounded-md pointer-events-none border border-emerald-500/60" />
+                </div>
+              </div>
+              <div className="mt-1 flex items-end justify-between text-[10px] font-semibold leading-none opacity-80">
+                <span>{locker.label}</span>
+                <span>
+                  {locker.size === 'small'
+                    ? '小格'
+                    : locker.size === 'medium'
+                      ? '中格'
+                      : '大格'}
+                </span>
+              </div>
             </div>
           </button>
         );
