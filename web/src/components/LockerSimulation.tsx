@@ -234,8 +234,8 @@ export default function LockerSimulation() {
           快递柜
         </div>
 
-        <div className="flex flex-col md:flex-row md:h-[560px] md:items-stretch">
-          <div className="flex-1 bg-gradient-to-br from-emerald-200 to-lime-200 p-3 md:p-6 md:h-full">
+        <div className="flex flex-col md:flex-row md:min-h-[640px] xl:min-h-[700px] md:items-stretch">
+          <div className="flex-1 bg-gradient-to-br from-emerald-200 to-lime-200 p-3 md:p-6 md:flex md:flex-col">
             <LockerGrid
               lockers={lockers}
               openLockerId={openLockerId}
@@ -248,7 +248,7 @@ export default function LockerSimulation() {
             />
           </div>
 
-          <div className="w-full md:w-[320px] bg-slate-900 text-slate-100 p-5 flex flex-col gap-4 md:h-full">
+          <div className="w-full md:w-[320px] bg-slate-900 text-slate-100 p-5 flex flex-col gap-4 md:min-h-full">
             <ScreenHeader
               availableStats={availableStats}
               isLoading={loading}

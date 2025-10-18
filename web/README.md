@@ -48,29 +48,78 @@ web/
 
 ## 安装与部署
 
-### 生产构建
+以下步骤面向没有开发经验的老师或同学，请按顺序逐条执行。
+
+### 1. 准备运行环境
+
+1. 打开浏览器访问 [https://nodejs.org/zh-cn](https://nodejs.org/zh-cn)。
+2. 在首页选择“LTS（长期支持版）”，点击下载适合自己系统（Windows/macOS）的安装包。
+3. 下载完成后双击安装包，安装过程保持默认选项即可。Node.js 会同时安装 `npm`（包管理器）。
+4. 安装结束后，打开终端：
+   - Windows：按 `Win + X` → 选择“Windows PowerShell”或“终端”；
+   - macOS：打开“应用程序” → “实用工具” → “终端”。
+5. 在终端输入以下命令检查安装是否成功（回车后应看到版本号）：
+   ```bash
+   node -v
+   npm -v
+   ```
+   如果命令无法识别，请重新启动电脑后再试一次。
+
+### 2. 获取程序并进入目录
+
+1. 将老师提供的项目压缩包解压，或从 GitHub 下载源码后解压。
+2. 记住解压后的路径（例如 `C:\Users\你的名字\Desktop\delivery-simulation`）。
+3. 在终端中输入（请把路径替换成自己的实际路径）：
+   ```bash
+   cd C:\Users\你的名字\Desktop\delivery-simulation\web
+   ```
+   macOS 下示例：
+   ```bash
+   cd ~/Desktop/delivery-simulation/web
+   ```
+
+### 3. 安装项目依赖（只需首次执行）
 
 ```bash
-cd web
 npm install
-npm run build
 ```
 
-构建完成后，Next.js 会生成可供生产运行的 `.next` 文件夹，以及使用 SQLite 的运行时依赖（`data/locker.db` 在首次运行时才会自动创建）。
+- 第一次安装会从网络下载所需的开源包，时间可能在 1-5 分钟之间。
+- 安装成功会回到命令提示符，无错误信息。
 
-### 启动生产服务
+### 4. 课堂演示 / 测试运行
 
 ```bash
-npm run start
+npm run dev
 ```
 
-默认监听 `http://localhost:3000`。部署到服务器时，可使用常见的进程管理工具（如 PM2、systemd）守护 `npm run start`。
+- 终端提示 `Ready in http://localhost:3000` 后，打开浏览器访问该地址即可看到系统。
+- 想停止运行时，在终端按 `Ctrl + C`（Windows/macOS 通用）。
 
-### 注意事项
+### 5. 正式部署（供长期使用）
 
-- 生产环境同样需要持久化 `data` 目录，以保留柜格状态与包裹数据。
-- 如果部署在多实例场景，请为 SQLite 提供共享存储或改为集中式数据库（后续迭代可替换）。
-- 如果需要在不同端口或域名运行，可通过设置环境变量 `PORT`、`HOSTNAME` 来覆盖默认配置。
+1. 构建生产版本：
+   ```bash
+   npm run build
+   ```
+2. 启动生产服务：
+   ```bash
+   npm run start
+   ```
+3. 浏览器访问 [http://localhost:3000](http://localhost:3000) 即可使用。
+4. 生产服务运行期间不要关闭终端窗口，如需停止服务同样按 `Ctrl + C`。
+5. 如果希望关掉终端后服务仍继续运行，可在具备经验的同事帮助下配置 PM2、systemd 等进程守护工具。
+
+### 6. 数据存储说明
+
+- 系统会在首次运行时自动创建 `data/locker.db` 数据库文件，用于记录柜门状态。
+- 请不要删除 `data` 文件夹；若确需重置所有数据，先关闭程序，再手动删除其中的 `locker.db*` 文件，重新运行后会自动生成空数据库。
+
+### 7. 常见问题
+
+- **端口被占用**：如果已有其他程序占用 3000 端口，启动时会失败。可在终端运行 `PORT=4000 npm run start`（Windows PowerShell 使用 `$env:PORT=4000; npm run start`）选择其他端口。
+- **安装时网络慢或失败**：确保设备联网；必要时更换网络或稍后再试。
+- **权限提示**：若提示没有权限，尝试以管理员身份运行终端（Windows 右键“以管理员身份运行”）。
 
 ## 操作指南
 
