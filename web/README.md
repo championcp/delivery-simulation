@@ -121,6 +121,53 @@ npm run dev
 - **安装时网络慢或失败**：确保设备联网；必要时更换网络或稍后再试。
 - **权限提示**：若提示没有权限，尝试以管理员身份运行终端（Windows 右键“以管理员身份运行”）。
 
+### 8. 傻瓜式一键部署包（开发人员预制）
+
+若需将系统交付给完全没有开发经验的老师或学生使用，可由开发人员提前打包“解压即用”的 Windows 体验包。
+
+#### 8.1 打包脚本
+
+仓库提供脚本 `./scripts/package-windows.sh`，在 macOS 或 Linux 开发机上执行即可完成以下操作：
+
+1. 安装依赖并构建 Next.js 项目。
+2. 复制产物到临时目录并清理 `data/` 下的数据库文件。
+3. 以 `win32/x64` 平台重新安装 `node_modules`（仅保留生产依赖）。
+4. 下载 Node.js 便携版（默认使用当前本机 Node 版本）。
+5. 生成用于 Windows 的 `start.bat` 启动脚本。
+6. 输出压缩包 `dist/locker-simulator-win64.zip`。
+
+运行方式：
+
+```bash
+./scripts/package-windows.sh
+```
+
+- 若需要指定 Windows 端使用的 Node.js 版本，可传入环境变量，例如：
+  ```bash
+  NODE_VERSION_OVERRIDE=20.17.0 ./scripts/package-windows.sh
+  ```
+- 脚本在执行过程中会使用临时目录 `.tmp/package-win`，最终产物位于 `dist/`.
+
+#### 8.2 最终目录结构
+
+脚本生成的压缩包内部结构如下：
+
+```
+dist/locker-simulator-win64.zip
+├─ node/             # 便携版 Node.js (win-x64)
+├─ web/              # 应用代码、.next、node_modules、data/
+└─ start.bat         # Windows 一键启动脚本
+```
+
+#### 8.3 部署者使用步骤
+
+1. 解压收到的压缩包，例如到 `C:\locker-simulator`。
+2. 双击 `start.bat`，等待终端提示服务启动（默认端口 3000）。
+3. 打开浏览器访问 [http://localhost:3000](http://localhost:3000) 即可体验。
+4. 体验结束后在终端按 `Ctrl + C` 或关闭窗口，完成退出。
+
+> macOS 也可参考同样的目录结构，新增 `start.command`（自行 `chmod +x`）后即可双击运行。
+
 ## 操作指南
 
 ### 快递员投件流程
