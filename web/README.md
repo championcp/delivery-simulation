@@ -48,54 +48,55 @@ web/
 
 ## 安装与部署
 
-以下内容面向首次部署本系统的老师或同学，即便没有开发经验也可以按照步骤完成。
+以下步骤面向没有开发经验的老师或同学，请按顺序逐条执行。
 
-### 1. 安装 Node.js（只需一次）
+### 1. 准备运行环境
 
 1. 打开浏览器访问 [https://nodejs.org/zh-cn](https://nodejs.org/zh-cn)。
-2. 在页面顶部选择 **LTS（长期支持版）**，下载适合操作系统的安装程序（Windows `.msi` / macOS `.pkg`）。
-3. 双击安装程序并使用默认选项完成安装。安装结束后，系统会同时提供 `node` 与 `npm`。
-4. 打开终端验证：
-   - Windows：按 `Win + X` → “终端”或“PowerShell”。
-   - macOS：在 Launchpad 中搜索“终端”。
+2. 在首页选择“LTS（长期支持版）”，点击下载适合自己系统（Windows/macOS）的安装包。
+3. 下载完成后双击安装包，安装过程保持默认选项即可。Node.js 会同时安装 `npm`（包管理器）。
+4. 安装结束后，打开终端：
+   - Windows：按 `Win + X` → 选择“Windows PowerShell”或“终端”；
+   - macOS：打开“应用程序” → “实用工具” → “终端”。
+5. 在终端输入以下命令检查安装是否成功（回车后应看到版本号）：
    ```bash
    node -v
    npm -v
    ```
-   能看到版本号即代表安装成功；若提示找不到命令，可重启电脑后再试。
+   如果命令无法识别，请重新启动电脑后再试一次。
 
-### 2. 下载并进入项目目录
+### 2. 获取程序并进入目录
 
-1. 解压老师提供的项目压缩包（或从 GitHub 下载后解压）。
-2. 假设解压到 `D:\delivery-simulation`，请记住路径。
-3. 在终端输入（路径根据实际情况替换）：
+1. 将老师提供的项目压缩包解压，或从 GitHub 下载源码后解压。
+2. 记住解压后的路径（例如 `C:\Users\你的名字\Desktop\delivery-simulation`）。
+3. 在终端中输入（请把路径替换成自己的实际路径）：
    ```bash
-   cd D:\delivery-simulation\web
+   cd C:\Users\你的名字\Desktop\delivery-simulation\web
    ```
-   macOS 示例：
+   macOS 下示例：
    ```bash
-   cd ~/Downloads/delivery-simulation/web
+   cd ~/Desktop/delivery-simulation/web
    ```
 
-### 3. 安装依赖（首次运行必做）
+### 3. 安装项目依赖（只需首次执行）
 
 ```bash
 npm install
 ```
 
-- 该命令会下载系统所需的开源组件，耗时约 1-5 分钟。
-- 结束时回到命令提示符，无错误报错即可进入下一步。
+- 第一次安装会从网络下载所需的开源包，时间可能在 1-5 分钟之间。
+- 安装成功会回到命令提示符，无错误信息。
 
-### 4. 课堂演示 / 本地测试
+### 4. 课堂演示 / 测试运行
 
 ```bash
 npm run dev
 ```
 
-- 终端提示 `Ready in http://localhost:3000` 后，打开浏览器访问该地址即可体验。
-- 结束体验时，在终端按 `Ctrl + C` 停止服务。
+- 终端提示 `Ready in http://localhost:3000` 后，打开浏览器访问该地址即可看到系统。
+- 想停止运行时，在终端按 `Ctrl + C`（Windows/macOS 通用）。
 
-### 5. 正式部署（长期运行）
+### 5. 正式部署（供长期使用）
 
 1. 构建生产版本：
    ```bash
@@ -105,75 +106,20 @@ npm run dev
    ```bash
    npm run start
    ```
-3. 浏览器访问 [http://localhost:3000](http://localhost:3000) 即可。
-4. 服务运行期间请保持终端窗口开启；若需停止，按 `Ctrl + C`。
-5. 若希望关闭窗口后继续运行，可在技术同事帮助下配置 PM2、systemd 等进程守护方式。
+3. 浏览器访问 [http://localhost:3000](http://localhost:3000) 即可使用。
+4. 生产服务运行期间不要关闭终端窗口，如需停止服务同样按 `Ctrl + C`。
+5. 如果希望关掉终端后服务仍继续运行，可在具备经验的同事帮助下配置 PM2、systemd 等进程守护工具。
 
 ### 6. 数据存储说明
 
-- 首次运行时，系统会在 `web/data/` 下自动生成 `locker.db` 数据库文件，用于记录柜门及包裹信息。
-- 请勿删除 `data` 目录；若确需重置所有数据，先停止程序，再删除其中的 `locker.db*` 文件。
+- 系统会在首次运行时自动创建 `data/locker.db` 数据库文件，用于记录柜门状态。
+- 请不要删除 `data` 文件夹；若确需重置所有数据，先关闭程序，再手动删除其中的 `locker.db*` 文件，重新运行后会自动生成空数据库。
 
 ### 7. 常见问题
 
-- **端口被占用**：若 3000 端口已被其他应用占用，可通过 `PORT=4000 npm run start`（Windows PowerShell 使用 `$env:PORT=4000; npm run start`）改用其他端口。
-- **网络缓慢或安装失败**：确保设备联网良好，可更换网络后重试。
-- **权限不足**：若提示权限错误，请以管理员身份运行终端（Windows 右键“以管理员身份运行”）。
-
-### 8. 傻瓜式一键部署包（开发人员预制）
-
-为方便完全没有工程背景的老师使用，可由开发人员制作“解压即用”的一键部署包。
-
-#### 开发人员制作步骤
-
-1. 在开发机执行：
-   ```bash
-   cd web
-   npm install
-   npm run build
-   npm prune --omit=dev
-   ```
-   确保 `node_modules` 与 `.next` 已生成。
-2. 下载 Node.js 便携版 ZIP（Windows）或 tar.gz（macOS/Linux），解压至 `bundle/node/`。
-3. 创建目录结构：
-   ```
-   bundle/
-   ├─ node/                # Node 便携版（包含 node.exe 或 bin/node）
-   ├─ web/                 # 本项目目录（包含 .next、node_modules、data 等）
-   ├─ start.bat            # Windows 启动脚本
-   └─ start.command        # macOS 双击脚本（可选）
-   ```
-4. `start.bat` 示例：
-   ```bat
-   @echo off
-   setlocal
-   set APP_DIR=%~dp0web
-   set NODE_DIR=%~dp0node
-   cd /d "%APP_DIR%"
-   if not exist data mkdir data
-   "%NODE_DIR%\node.exe" node_modules\npm\bin\npm-cli.js run start
-   endlocal
-   pause
-   ```
-5. macOS `start.command` 示例：
-   ```bash
-   #!/bin/bash
-   DIR="$(cd "$(dirname "$0")" && pwd)"
-   APP_DIR="$DIR/web"
-   NODE_BIN="$DIR/node/bin/node"
-   mkdir -p "$APP_DIR/data"
-   cd "$APP_DIR"
-   "$NODE_BIN" node_modules/npm/bin/npm-cli.js run start
-   ```
-   保存后运行 `chmod +x start.command`。
-6. 将 `bundle` 目录压缩为 `locker-simulator-win64.zip` 等文件提供给部署者。
-
-#### 使用者操作步骤
-
-1. 解压压缩包至任意目录（例如 `C:\locker-simulator`）。
-2. Windows 用户双击 `start.bat`，macOS 用户双击 `start.command`。
-3. 终端窗口提示服务已启动后，访问 [http://localhost:3000](http://localhost:3000) 即可使用。
-4. 使用结束后，在窗口内按 `Ctrl + C` 或关闭窗口。
+- **端口被占用**：如果已有其他程序占用 3000 端口，启动时会失败。可在终端运行 `PORT=4000 npm run start`（Windows PowerShell 使用 `$env:PORT=4000; npm run start`）选择其他端口。
+- **安装时网络慢或失败**：确保设备联网；必要时更换网络或稍后再试。
+- **权限提示**：若提示没有权限，尝试以管理员身份运行终端（Windows 右键“以管理员身份运行”）。
 
 ## 操作指南
 

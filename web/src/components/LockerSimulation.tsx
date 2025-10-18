@@ -32,21 +32,10 @@ const SIZE_OPTIONS: { value: LockerSize; label: string; hint: string }[] = [
   { value: 'large', label: '大格', hint: '适合体积较大的包裹' },
 ];
 
-const INTERIOR_SCALE: Record<LockerSize, number> = {
-  small: 0.56,
-  medium: 0.7,
-  large: 0.85,
-};
-
-const PACKAGE_SCALE: Record<LockerSize, number> = {
-  small: 0.48,
-  medium: 0.58,
-  large: 0.66,
-};
-
-type LockerAnimation = {
-  direction: 'incoming';
-  key: number;
+const DOOR_SIZE_CLASS: Record<LockerSize, string> = {
+  small: 'w-[46%] max-w-[56px]',
+  medium: 'w-[62%] max-w-[68px]',
+  large: 'w-[78%] max-w-[80px]',
 };
 
 interface CourierFormState {
@@ -317,7 +306,7 @@ export default function LockerSimulation() {
           快递柜
         </div>
 
-        <div className="flex flex-col md:flex-row md:min-h-[560px] xl:min-h-[620px] md:items-stretch">
+        <div className="flex flex-col md:flex-row md:min-h-[640px] xl:min-h-[700px] md:items-stretch">
           <div className="flex-1 bg-gradient-to-br from-emerald-200 to-lime-200 p-3 md:p-6 md:flex md:flex-col">
             <LockerGrid
               lockers={lockers}
@@ -333,7 +322,7 @@ export default function LockerSimulation() {
             />
           </div>
 
-          <div className="w-full md:w-[280px] bg-slate-900 text-slate-100 p-4 flex flex-col gap-4 md:min-h-full">
+          <div className="w-full md:w-[320px] bg-slate-900 text-slate-100 p-5 flex flex-col gap-4 md:min-h-full">
             <ScreenHeader
               availableStats={availableStats}
               isLoading={loading}
@@ -703,62 +692,45 @@ function LockerGrid({
           >
             <div className="absolute inset-0 flex items-center justify-center">
               <div
-                className="relative flex items-center justify-center"
-                style={interiorStyle}
+                className={`relative rounded-md border border-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-200 shadow-inner transition-all duration-500 ease-in-out ${DOOR_SIZE_CLASS[locker.size]}`}
               >
-                <div className="absolute inset-0 rounded-lg border border-emerald-500/45 bg-gradient-to-br from-white/75 to-emerald-100/60 shadow-inner" />
-                {showActivePackage && (
-                  <div
-                    key={packageKey}
-                    className={`relative z-20 flex items-center justify-center rounded-sm border border-amber-500/70 bg-amber-300 shadow-md shadow-amber-700/30 ${packageAnimationClass}`}
-                    style={{ ...packageStyle, opacity: packageOverlayOpacity }}
-                  >
-                    <div className="absolute inset-0 rounded-[3px] border border-white/40 opacity-60" />
-                    <div className="absolute inset-x-1 top-[34%] h-[30%] rounded-[2px] bg-amber-500/75" />
-                  </div>
-                )}
+                <div
+                  className="absolute inset-0 rounded-md origin-left transition-transform duration-500 ease-in-out"
+                  style={{
+                    transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
+                    backgroundColor: isOccupied ? '#7ed957' : '#b9f2a1',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.15)',
+                  }}
+                />
+                <div className="absolute inset-0 rounded-md pointer-events-none border border-emerald-500/60" />
               </div>
             </div>
-
-            <div
-              className="absolute inset-0 rounded-lg origin-left transition-transform duration-500 ease-in-out"
-              style={{
-                transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
-                background: doorBackground,
-                border: '1px solid rgba(18, 114, 94, 0.55)',
-                boxShadow: doorShadow,
-              }}
-            />
-
-            {hasStoredPackage && !isOpen && (
-              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+            <div className="relative z-10 flex h-full w-full flex-col px-1 pb-1 pt-1.5 text-emerald-900">
+              <div className="flex flex-1 items-center justify-center">
                 <div
-                  className="relative flex items-center justify-center"
-                  style={interiorStyle}
+                  className={`relative aspect-square ${DOOR_SIZE_CLASS[locker.size]} rounded-md border border-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-200 shadow-inner transition-all duration-500 ease-in-out`}
                 >
                   <div
-                    className="relative flex items-center justify-center rounded-sm border border-amber-500/60 bg-amber-300/80 shadow-md shadow-amber-700/20"
-                    style={{ ...packageStyle, opacity: 0.55 }}
-                  >
-                    <div className="absolute inset-0 rounded-[3px] border border-white/40 opacity-45" />
-                    <div className="absolute inset-x-1 top-[34%] h-[30%] rounded-[2px] bg-amber-500/60" />
-                  </div>
+                    className="absolute inset-0 rounded-md origin-left transition-transform duration-500 ease-in-out"
+                    style={{
+                      transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
+                      backgroundColor: isOccupied ? '#7ed957' : '#b9f2a1',
+                      boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.15)',
+                    }}
+                  />
+                  <div className="absolute inset-0 rounded-md pointer-events-none border border-emerald-500/60" />
                 </div>
               </div>
-            )}
-
-            <div className="relative z-40 flex h-full w-full flex-col px-1 pb-1 pt-1.5 text-emerald-900">
-              <span className="text-[10px] font-semibold opacity-80">
-                {locker.label}
-              </span>
-              <div className="flex-1" />
-              <span className="text-[10px] font-semibold opacity-80 self-end">
-                {locker.size === 'small'
-                  ? '小格'
-                  : locker.size === 'medium'
-                    ? '中格'
-                    : '大格'}
-              </span>
+              <div className="mt-1 flex items-end justify-between text-[10px] font-semibold leading-none opacity-80">
+                <span>{locker.label}</span>
+                <span>
+                  {locker.size === 'small'
+                    ? '小格'
+                    : locker.size === 'medium'
+                      ? '中格'
+                      : '大格'}
+                </span>
+              </div>
             </div>
           </button>
         );
