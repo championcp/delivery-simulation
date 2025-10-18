@@ -66,7 +66,14 @@ endlocal
 pause
 BAT
 
-chmod +x "${DIST_DIR}/start.bat"
+# convert to CRLF for Windows compatibility
+python - <<PY
+from pathlib import Path
+path = Path(r"${DIST_DIR}") / "start.bat"
+text = path.read_text(encoding="utf-8")
+text = text.replace("\r\n", "\n")
+path.write_text(text.replace("\n", "\r\n"), encoding="utf-8")
+PY
 
 echo "==> Packaging bundle"
 mkdir -p "${DIST_ROOT}"
