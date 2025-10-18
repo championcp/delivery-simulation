@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type LockerSize = 'small' | 'medium' | 'large';
@@ -31,6 +32,23 @@ const SIZE_OPTIONS: { value: LockerSize; label: string; hint: string }[] = [
   { value: 'large', label: '大格', hint: '适合体积较大的包裹' },
 ];
 
+const INTERIOR_SCALE: Record<LockerSize, number> = {
+  small: 0.56,
+  medium: 0.7,
+  large: 0.85,
+};
+
+const PACKAGE_SCALE: Record<LockerSize, number> = {
+  small: 0.48,
+  medium: 0.58,
+  large: 0.66,
+};
+
+type LockerAnimation = {
+  direction: 'incoming' | 'outgoing';
+  key: number;
+};
+
 interface CourierFormState {
   recipientName: string;
   recipientPhone: string;
@@ -55,6 +73,10 @@ export default function LockerSimulation() {
   const [openLockerId, setOpenLockerId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const [lockerAnimations, setLockerAnimations] = useState<
+    Record<number, LockerAnimation>
+  >({});
+  const animationTimeoutsRef = useRef<Record<number, number>>({});
 
   const fetchLockers = useCallback(async () => {
     try {
@@ -73,6 +95,14 @@ export default function LockerSimulation() {
   useEffect(() => {
     fetchLockers();
   }, [fetchLockers]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(animationTimeoutsRef.current).forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+    };
+  }, []);
 
   const availableStats = useMemo(() => {
     const total = lockers.length;
@@ -115,6 +145,33 @@ export default function LockerSimulation() {
     oscillator.stop(context.currentTime + 0.6);
   }, [ensureAudioContext]);
 
+  const triggerPackageAnimation = useCallback(
+    (lockerId: number, direction: 'incoming' | 'outgoing') => {
+      const key = Date.now() + Math.random();
+      setLockerAnimations((prev) => ({
+        ...prev,
+        [lockerId]: { direction, key },
+      }));
+      if (animationTimeoutsRef.current[lockerId]) {
+        window.clearTimeout(animationTimeoutsRef.current[lockerId]);
+      }
+      const duration = direction === 'incoming' ? 1100 : 900;
+      animationTimeoutsRef.current[lockerId] = window.setTimeout(() => {
+        setLockerAnimations((prev) => {
+          const current = prev[lockerId];
+          if (!current || current.key !== key) {
+            return prev;
+          }
+          const copy = { ...prev };
+          delete copy[lockerId];
+          return copy;
+        });
+        delete animationTimeoutsRef.current[lockerId];
+      }, duration);
+    },
+    [],
+  );
+
   const handleCourierSubmit = async () => {
     setLoading(true);
     setError(null);
@@ -144,6 +201,7 @@ export default function LockerSimulation() {
       });
       setMessage(data.instructions);
       setOpenLockerId(data.locker.id);
+      triggerPackageAnimation(data.locker.id, 'incoming');
       await fetchLockers();
       await playChime();
     } catch (err) {
@@ -186,6 +244,7 @@ export default function LockerSimulation() {
       });
       setMessage(data.message);
       setOpenLockerId(data.locker.id);
+      triggerPackageAnimation(data.locker.id, 'outgoing');
       setPickupInput('');
       await fetchLockers();
       await playChime();
@@ -204,9 +263,27 @@ export default function LockerSimulation() {
     setOpenLockerId(null);
     setMessage(null);
     setError(null);
+    Object.values(animationTimeoutsRef.current).forEach((timerId) =>
+      window.clearTimeout(timerId),
+    );
+    animationTimeoutsRef.current = {};
+    setLockerAnimations({});
   };
 
   const handleDoorClosed = async () => {
+    const closingLockerId = openLockerId;
+    if (closingLockerId != null) {
+      if (animationTimeoutsRef.current[closingLockerId]) {
+        window.clearTimeout(animationTimeoutsRef.current[closingLockerId]);
+        delete animationTimeoutsRef.current[closingLockerId];
+      }
+      setLockerAnimations((prev) => {
+        if (!prev[closingLockerId]) return prev;
+        const copy = { ...prev };
+        delete copy[closingLockerId];
+        return copy;
+      });
+    }
     setOpenLockerId(null);
     setMessage('柜门已关闭，欢迎再次使用！');
     setTimeout(() => {
@@ -228,11 +305,12 @@ export default function LockerSimulation() {
           快递柜
         </div>
 
-        <div className="flex flex-col md:flex-row md:h-[560px] md:items-stretch">
-          <div className="flex-1 bg-gradient-to-br from-emerald-200 to-lime-200 p-3 md:p-6 md:h-full">
+        <div className="flex flex-col md:flex-row md:min-h-[640px] xl:min-h-[700px] md:items-stretch">
+          <div className="flex-1 bg-gradient-to-br from-emerald-200 to-lime-200 p-3 md:p-6 md:flex md:flex-col">
             <LockerGrid
               lockers={lockers}
               openLockerId={openLockerId}
+              lockerAnimations={lockerAnimations}
               onSelectLocker={(lockerId) => {
                 const locker = lockers.find((item) => item.id === lockerId);
                 if (locker) {
@@ -242,7 +320,7 @@ export default function LockerSimulation() {
             />
           </div>
 
-          <div className="w-full md:w-[320px] bg-slate-900 text-slate-100 p-5 flex flex-col gap-4 md:h-full">
+          <div className="w-full md:w-[320px] bg-slate-900 text-slate-100 p-5 flex flex-col gap-4 md:min-h-full">
             <ScreenHeader
               availableStats={availableStats}
               isLoading={loading}
@@ -557,10 +635,12 @@ function ScreenContent(props: {
 function LockerGrid({
   lockers,
   openLockerId,
+  lockerAnimations,
   onSelectLocker,
 }: {
   lockers: Locker[];
   openLockerId: number | null;
+  lockerAnimations: Record<number, LockerAnimation>;
   onSelectLocker: (lockerId: number) => void;
 }) {
   if (!lockers.length) {
@@ -575,24 +655,80 @@ function LockerGrid({
     <div className="grid grid-cols-6 grid-rows-4 gap-2 md:gap-3 h-full">
       {lockers.map((locker) => {
         const isOpen = openLockerId === locker.id;
-        const isOccupied = locker.status === 'occupied';
+        const hasStoredPackage = locker.status === 'occupied';
+        const animation = lockerAnimations[locker.id];
+        const showPackage =
+          (isOpen && (hasStoredPackage || Boolean(animation))) ||
+          Boolean(animation && animation.direction === 'outgoing');
+        const packageAnimationClass = animation
+          ? animation.direction === 'incoming'
+            ? 'animate-package-in'
+            : 'animate-package-out'
+          : '';
+        const packageKey =
+          animation?.key ?? (hasStoredPackage ? 'stored' : 'empty');
+        const interiorScale = INTERIOR_SCALE[locker.size];
+        const interiorStyle: CSSProperties = {
+          width: `${interiorScale * 100}%`,
+          height: `${interiorScale * 100}%`,
+        };
+        const packageWidthScale = PACKAGE_SCALE[locker.size];
+        const packageHeightScale = PACKAGE_SCALE[locker.size] * 0.72;
+        const packageStyle: CSSProperties = {
+          width: `${packageWidthScale * 100}%`,
+          height: `${packageHeightScale * 100}%`,
+        };
+        const doorBackground = hasStoredPackage
+          ? 'linear-gradient(135deg, rgba(14, 130, 100, 0.32), rgba(8, 94, 75, 0.18))'
+          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(226, 255, 244, 0.66))';
+        const doorShadow = hasStoredPackage
+          ? '0 3px 8px rgba(0, 90, 70, 0.22)'
+          : '0 3px 8px rgba(0, 0, 0, 0.16)';
+
         return (
           <button
             key={locker.id}
             className="relative rounded-lg border-2 border-emerald-600 bg-emerald-300 focus:outline-none focus:ring-4 focus:ring-emerald-400/60 overflow-hidden transition-transform hover:scale-[1.01]"
             onClick={() => onSelectLocker(locker.id)}
           >
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="relative flex items-center justify-center"
+                style={interiorStyle}
+              >
+                <div className="absolute inset-0 rounded-lg border border-emerald-500/45 bg-gradient-to-br from-white/75 to-emerald-100/60 shadow-inner" />
+                {showPackage && (
+                  <div
+                    key={packageKey}
+                    className={`relative z-20 flex items-center justify-center rounded-sm border border-amber-500/70 bg-amber-300 shadow-md shadow-amber-700/30 ${packageAnimationClass}`}
+                    style={packageStyle}
+                  >
+                    <div className="absolute inset-0 rounded-[3px] border border-white/40 opacity-60" />
+                    <div className="absolute inset-x-1 top-[34%] h-[30%] rounded-[2px] bg-amber-500/75" />
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div
-              className="absolute inset-0 origin-left transition-transform duration-500 ease-in-out"
+              className="absolute inset-0 rounded-lg origin-left transition-transform duration-500 ease-in-out"
               style={{
                 transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
-                backgroundColor: isOccupied ? '#7ed957' : '#b9f2a1',
+                background: doorBackground,
+                border: '1px solid rgba(18, 114, 94, 0.55)',
+                boxShadow: doorShadow,
               }}
-            />
-            <div className="relative z-10 h-full w-full flex flex-col justify-between p-1 text-left text-emerald-900">
+            >
+              {hasStoredPackage && !isOpen && (
+                <div className="absolute inset-1 rounded-md bg-emerald-900/12 backdrop-blur-[1px]" />
+              )}
+            </div>
+
+            <div className="relative z-30 flex h-full w-full flex-col px-1 pb-1 pt-1.5 text-emerald-900">
               <span className="text-[10px] font-semibold opacity-80">
                 {locker.label}
               </span>
+              <div className="flex-1" />
               <span className="text-[10px] font-semibold opacity-80 self-end">
                 {locker.size === 'small'
                   ? '小格'
