@@ -40,6 +40,38 @@ echo "==> Installing Windows production dependencies"
 pushd "${DIST_DIR}/web" >/dev/null
 rm -rf node_modules
 npm_config_platform=win32 npm_config_arch=x64 npm ci --omit=dev
+cat <<'JSON' > "package.json"
+{
+  "name": "locker-simulator-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "next": "$(node -p "require('./package.json').dependencies.next")",
+    "react": "$(node -p "require('./package.json').dependencies.react")",
+    "react-dom": "$(node -p "require('./package.json').dependencies['react-dom']")"
+  }
+}
+JSON
+cat <<'JSON' > "package-lock.json"
+{
+  "name": "locker-simulator-runtime",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "locker-simulator-runtime",
+      "version": "1.0.0",
+      "dependencies": {
+        "next": "$(node -p "require('./package.json').dependencies.next")",
+        "react": "$(node -p "require('./package.json').dependencies.react")",
+        "react-dom": "$(node -p "require('./package.json').dependencies['react-dom']")"
+      }
+    }
+  }
+}
+JSON
+mkdir -p node_modules/next node_modules/react node_modules/react-dom
 popd >/dev/null
 
 echo "==> Downloading Node.js ${NODE_VERSION} (win-x64 portable)"
