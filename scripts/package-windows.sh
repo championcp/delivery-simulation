@@ -53,15 +53,18 @@ cat <<'BAT' > "${DIST_DIR}/start.bat"
 setlocal
 set "APP_DIR=%~dp0web"
 set "NODE_DIR=%~dp0node"
-set "NPM_CLI=%NODE_DIR%\node_modules\npm\bin\npm-cli.js"
-if not exist "%NPM_CLI%" (
-  echo 未找到 npm-cli.js，请确认压缩包是否完整后重试。
+set "NEXT_BIN=%APP_DIR%\node_modules\next\dist\bin\next"
+if not exist "%NEXT_BIN%" (
+  echo 未找到 next 执行文件，请确认压缩包是否完整后重试。
   pause
   exit /b 1
 )
 cd /d "%APP_DIR%"
 if not exist data mkdir data
-"%NODE_DIR%\node.exe" "%NPM_CLI%" --prefix "%APP_DIR%" run start
+if "%PORT%"=="" (
+  set "PORT=3000"
+)
+"%NODE_DIR%\node.exe" "%NEXT_BIN%" start -p %PORT%
 endlocal
 pause
 BAT

@@ -167,7 +167,7 @@ dist/locker-simulator-win64.zip
 4. 体验结束后在终端按 `Ctrl + C` 或关闭窗口，完成退出。
 
 > macOS 也可参考同样的目录结构，新增 `start.command`（自行 `chmod +x`）后即可双击运行。  
-> 若启动时出现 “Cannot find module ... npm-cli.js”，通常是压缩包解压不完整或 Node 便携包下载异常，可重新执行脚本生成安装包。
+> 启动脚本会直接使用便携版 Node 调用 `node_modules/next/dist/bin/next start`，如遇问题可重新执行脚本生成安装包。
 
 ## 操作指南
 
