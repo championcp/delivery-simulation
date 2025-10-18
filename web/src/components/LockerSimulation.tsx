@@ -307,17 +307,17 @@ export default function LockerSimulation() {
   const keypadNumbers = useMemo(() => ['1', '2', '3', '4', '5', '6', '7', '8', '9', '清空', '0', '删除'], []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-100 via-emerald-50 to-emerald-100 flex flex-col items-center py-8 px-4">
-      <h1 className="text-3xl md:text-4xl font-bold text-emerald-700 mb-6">
+    <div className="min-h-screen bg-gradient-to-b from-sky-100 via-emerald-50 to-emerald-100 flex flex-col items-center py-6 px-4">
+      <h1 className="text-2xl md:text-3xl font-bold text-emerald-700 mb-4">
         信息科技小课堂快递柜体验系统 V1.0
       </h1>
 
       <div className="w-full max-w-6xl bg-emerald-200 rounded-3xl shadow-2xl border-4 border-emerald-400 overflow-hidden">
-        <div className="bg-sky-300 text-center py-4 text-2xl font-semibold tracking-[.4em] text-emerald-900">
+        <div className="bg-sky-300 text-center py-2 md:py-3 text-xl md:text-2xl font-semibold tracking-[.3em] text-emerald-900">
           快递柜
         </div>
 
-        <div className="flex flex-col md:flex-row md:min-h-[640px] xl:min-h-[700px] md:items-stretch">
+        <div className="flex flex-col md:flex-row md:min-h-[560px] xl:min-h-[620px] md:items-stretch">
           <div className="flex-1 bg-gradient-to-br from-emerald-200 to-lime-200 p-3 md:p-6 md:flex md:flex-col">
             <LockerGrid
               lockers={lockers}
@@ -333,7 +333,7 @@ export default function LockerSimulation() {
             />
           </div>
 
-          <div className="w-full md:w-[320px] bg-slate-900 text-slate-100 p-5 flex flex-col gap-4 md:min-h-full">
+          <div className="w-full md:w-[280px] bg-slate-900 text-slate-100 p-4 flex flex-col gap-4 md:min-h-full">
             <ScreenHeader
               availableStats={availableStats}
               isLoading={loading}
@@ -572,19 +572,19 @@ function ScreenContent(props: {
         <h2 className="text-lg font-semibold text-amber-200">
           请输入 6 位取件码
         </h2>
-        <div className="bg-slate-800 rounded-xl py-3 px-4 text-2xl tracking-[0.4em] text-center font-mono">
+        <div className="bg-slate-800 rounded-xl py-2.5 px-4 text-xl tracking-[0.35em] text-center font-mono">
           {pickupInput.padEnd(6, '•')}
         </div>
-        <div className="grid flex-1 grid-cols-3 gap-2">
+        <div className="grid flex-1 grid-cols-3 gap-1.5">
           {keypadNumbers.map((value) => (
             <button
               key={value}
-              className={`rounded-lg py-2 text-lg font-semibold transition-colors ${
+              className={`rounded-lg py-1.5 text-base font-semibold transition-colors ${
                 value === '清空'
-                  ? 'bg-slate-700 hover:bg-slate-600'
+                  ? 'bg-slate-700 hover:bg-slate-600 text-sm'
                   : value === '删除'
-                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-900'
-                    : 'bg-slate-800 hover:bg-slate-700'
+                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-900 text-sm'
+                    : 'bg-slate-800 hover:bg-slate-700 text-lg'
               }`}
               onClick={() => onKeypadClick(value)}
             >
@@ -594,13 +594,13 @@ function ScreenContent(props: {
         </div>
         <div className="mt-auto flex gap-2">
           <button
-            className="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-2 font-semibold"
+            className="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-1.5 font-semibold text-sm"
             onClick={onBackHome}
           >
             返回首页
           </button>
           <button
-            className="flex-1 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-lg py-2 font-semibold"
+            className="flex-1 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-lg py-1.5 font-semibold text-sm"
             onClick={onPickupConfirm}
           >
             打开柜门
