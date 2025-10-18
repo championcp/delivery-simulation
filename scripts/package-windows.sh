@@ -53,9 +53,15 @@ cat <<'BAT' > "${DIST_DIR}/start.bat"
 setlocal
 set APP_DIR=%~dp0web
 set NODE_DIR=%~dp0node
+set NPM_CLI=%NODE_DIR%\node_modules\npm\bin\npm-cli.js
+if not exist "%NPM_CLI%" (
+  echo 未找到 npm-cli.js，請確認壓縮包是否完整。
+  pause
+  exit /b 1
+)
 cd /d "%APP_DIR%"
 if not exist data mkdir data
-"%NODE_DIR%\node.exe" node_modules\npm\bin\npm-cli.js run start
+"%NODE_DIR%\node.exe" "%NPM_CLI%" --prefix "%APP_DIR%" run start
 endlocal
 pause
 BAT

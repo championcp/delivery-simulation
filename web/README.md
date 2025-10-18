@@ -166,7 +166,8 @@ dist/locker-simulator-win64.zip
 3. 打开浏览器访问 [http://localhost:3000](http://localhost:3000) 即可体验。
 4. 体验结束后在终端按 `Ctrl + C` 或关闭窗口，完成退出。
 
-> macOS 也可参考同样的目录结构，新增 `start.command`（自行 `chmod +x`）后即可双击运行。
+> macOS 也可参考同样的目录结构，新增 `start.command`（自行 `chmod +x`）后即可双击运行。  
+> 若启动时出现 “Cannot find module ... npm-cli.js”，通常是压缩包解压不完整或 Node 便携包下载异常，可重新执行脚本生成安装包。
 
 ## 操作指南
 
