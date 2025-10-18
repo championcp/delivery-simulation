@@ -45,7 +45,7 @@ const PACKAGE_SCALE: Record<LockerSize, number> = {
 };
 
 type LockerAnimation = {
-  direction: 'incoming' | 'outgoing';
+  direction: 'incoming';
   key: number;
 };
 
@@ -77,6 +77,9 @@ export default function LockerSimulation() {
     Record<number, LockerAnimation>
   >({});
   const animationTimeoutsRef = useRef<Record<number, number>>({});
+  const [manualPackageLockers, setManualPackageLockers] = useState<
+    Record<number, boolean>
+  >({});
 
   const fetchLockers = useCallback(async () => {
     try {
@@ -145,17 +148,16 @@ export default function LockerSimulation() {
     oscillator.stop(context.currentTime + 0.6);
   }, [ensureAudioContext]);
 
-  const triggerPackageAnimation = useCallback(
-    (lockerId: number, direction: 'incoming' | 'outgoing') => {
+  const triggerPackageAnimation = useCallback((lockerId: number) => {
       const key = Date.now() + Math.random();
       setLockerAnimations((prev) => ({
         ...prev,
-        [lockerId]: { direction, key },
+        [lockerId]: { direction: 'incoming', key },
       }));
       if (animationTimeoutsRef.current[lockerId]) {
         window.clearTimeout(animationTimeoutsRef.current[lockerId]);
       }
-      const duration = direction === 'incoming' ? 1100 : 900;
+      const duration = 1100;
       animationTimeoutsRef.current[lockerId] = window.setTimeout(() => {
         setLockerAnimations((prev) => {
           const current = prev[lockerId];
@@ -201,7 +203,7 @@ export default function LockerSimulation() {
       });
       setMessage(data.instructions);
       setOpenLockerId(data.locker.id);
-      triggerPackageAnimation(data.locker.id, 'incoming');
+      triggerPackageAnimation(data.locker.id);
       await fetchLockers();
       await playChime();
     } catch (err) {
@@ -244,7 +246,10 @@ export default function LockerSimulation() {
       });
       setMessage(data.message);
       setOpenLockerId(data.locker.id);
-      triggerPackageAnimation(data.locker.id, 'outgoing');
+      setManualPackageLockers((prev) => ({
+        ...prev,
+        [data.locker.id]: true,
+      }));
       setPickupInput('');
       await fetchLockers();
       await playChime();
@@ -268,6 +273,7 @@ export default function LockerSimulation() {
     );
     animationTimeoutsRef.current = {};
     setLockerAnimations({});
+    setManualPackageLockers({});
   };
 
   const handleDoorClosed = async () => {
@@ -278,6 +284,12 @@ export default function LockerSimulation() {
         delete animationTimeoutsRef.current[closingLockerId];
       }
       setLockerAnimations((prev) => {
+        if (!prev[closingLockerId]) return prev;
+        const copy = { ...prev };
+        delete copy[closingLockerId];
+        return copy;
+      });
+      setManualPackageLockers((prev) => {
         if (!prev[closingLockerId]) return prev;
         const copy = { ...prev };
         delete copy[closingLockerId];
@@ -311,6 +323,7 @@ export default function LockerSimulation() {
               lockers={lockers}
               openLockerId={openLockerId}
               lockerAnimations={lockerAnimations}
+              manualPackageLockers={manualPackageLockers}
               onSelectLocker={(lockerId) => {
                 const locker = lockers.find((item) => item.id === lockerId);
                 if (locker) {
@@ -636,11 +649,13 @@ function LockerGrid({
   lockers,
   openLockerId,
   lockerAnimations,
+  manualPackageLockers,
   onSelectLocker,
 }: {
   lockers: Locker[];
   openLockerId: number | null;
   lockerAnimations: Record<number, LockerAnimation>;
+  manualPackageLockers: Record<number, boolean>;
   onSelectLocker: (lockerId: number) => void;
 }) {
   if (!lockers.length) {
@@ -657,16 +672,13 @@ function LockerGrid({
         const isOpen = openLockerId === locker.id;
         const hasStoredPackage = locker.status === 'occupied';
         const animation = lockerAnimations[locker.id];
-        const showPackage =
-          (isOpen && (hasStoredPackage || Boolean(animation))) ||
-          Boolean(animation && animation.direction === 'outgoing');
-        const packageAnimationClass = animation
-          ? animation.direction === 'incoming'
-            ? 'animate-package-in'
-            : 'animate-package-out'
-          : '';
+        const manualPackage = manualPackageLockers[locker.id] ?? false;
+        const showActivePackage =
+          isOpen && (hasStoredPackage || Boolean(animation) || manualPackage);
+        const packageAnimationClass = animation ? 'animate-package-in' : '';
         const packageKey =
-          animation?.key ?? (hasStoredPackage ? 'stored' : 'empty');
+          animation?.key ??
+          (manualPackage ? `manual-${locker.id}` : hasStoredPackage ? 'stored' : 'empty');
         const interiorScale = INTERIOR_SCALE[locker.size];
         const interiorStyle: CSSProperties = {
           width: `${interiorScale * 100}%`,
@@ -678,12 +690,10 @@ function LockerGrid({
           width: `${packageWidthScale * 100}%`,
           height: `${packageHeightScale * 100}%`,
         };
-        const doorBackground = hasStoredPackage
-          ? 'linear-gradient(135deg, rgba(14, 130, 100, 0.32), rgba(8, 94, 75, 0.18))'
-          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(226, 255, 244, 0.66))';
-        const doorShadow = hasStoredPackage
-          ? '0 3px 8px rgba(0, 90, 70, 0.22)'
-          : '0 3px 8px rgba(0, 0, 0, 0.16)';
+        const doorBackground =
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(226, 255, 244, 0.7))';
+        const doorShadow = '0 3px 8px rgba(0, 0, 0, 0.12)';
+        const packageOverlayOpacity = isOpen ? 1 : 0.5;
 
         return (
           <button
@@ -697,11 +707,11 @@ function LockerGrid({
                 style={interiorStyle}
               >
                 <div className="absolute inset-0 rounded-lg border border-emerald-500/45 bg-gradient-to-br from-white/75 to-emerald-100/60 shadow-inner" />
-                {showPackage && (
+                {showActivePackage && (
                   <div
                     key={packageKey}
                     className={`relative z-20 flex items-center justify-center rounded-sm border border-amber-500/70 bg-amber-300 shadow-md shadow-amber-700/30 ${packageAnimationClass}`}
-                    style={packageStyle}
+                    style={{ ...packageStyle, opacity: packageOverlayOpacity }}
                   >
                     <div className="absolute inset-0 rounded-[3px] border border-white/40 opacity-60" />
                     <div className="absolute inset-x-1 top-[34%] h-[30%] rounded-[2px] bg-amber-500/75" />
@@ -718,13 +728,26 @@ function LockerGrid({
                 border: '1px solid rgba(18, 114, 94, 0.55)',
                 boxShadow: doorShadow,
               }}
-            >
-              {hasStoredPackage && !isOpen && (
-                <div className="absolute inset-1 rounded-md bg-emerald-900/12 backdrop-blur-[1px]" />
-              )}
-            </div>
+            />
 
-            <div className="relative z-30 flex h-full w-full flex-col px-1 pb-1 pt-1.5 text-emerald-900">
+            {hasStoredPackage && !isOpen && (
+              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+                <div
+                  className="relative flex items-center justify-center"
+                  style={interiorStyle}
+                >
+                  <div
+                    className="relative flex items-center justify-center rounded-sm border border-amber-500/60 bg-amber-300/80 shadow-md shadow-amber-700/20"
+                    style={{ ...packageStyle, opacity: 0.55 }}
+                  >
+                    <div className="absolute inset-0 rounded-[3px] border border-white/40 opacity-45" />
+                    <div className="absolute inset-x-1 top-[34%] h-[30%] rounded-[2px] bg-amber-500/60" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="relative z-40 flex h-full w-full flex-col px-1 pb-1 pt-1.5 text-emerald-900">
               <span className="text-[10px] font-semibold opacity-80">
                 {locker.label}
               </span>
