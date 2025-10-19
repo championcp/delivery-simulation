@@ -45,7 +45,7 @@ const PACKAGE_SCALE: Record<LockerSize, number> = {
 };
 
 type LockerAnimation = {
-  direction: 'incoming';
+  direction: 'incoming' | 'outgoing';
   key: number;
 };
 
@@ -148,16 +148,17 @@ export default function LockerSimulation() {
     oscillator.stop(context.currentTime + 0.6);
   }, [ensureAudioContext]);
 
-  const triggerPackageAnimation = useCallback((lockerId: number) => {
+  const triggerPackageAnimation = useCallback(
+    (lockerId: number, direction: LockerAnimation['direction']) => {
       const key = Date.now() + Math.random();
       setLockerAnimations((prev) => ({
         ...prev,
-        [lockerId]: { direction: 'incoming', key },
+        [lockerId]: { direction, key },
       }));
       if (animationTimeoutsRef.current[lockerId]) {
         window.clearTimeout(animationTimeoutsRef.current[lockerId]);
       }
-      const duration = 1100;
+      const duration = direction === 'incoming' ? 1100 : 900;
       animationTimeoutsRef.current[lockerId] = window.setTimeout(() => {
         setLockerAnimations((prev) => {
           const current = prev[lockerId];
@@ -203,7 +204,7 @@ export default function LockerSimulation() {
       });
       setMessage(data.instructions);
       setOpenLockerId(data.locker.id);
-      triggerPackageAnimation(data.locker.id);
+      triggerPackageAnimation(data.locker.id, 'incoming');
       await fetchLockers();
       await playChime();
     } catch (err) {
@@ -250,6 +251,7 @@ export default function LockerSimulation() {
         ...prev,
         [data.locker.id]: true,
       }));
+      triggerPackageAnimation(data.locker.id, 'outgoing');
       setPickupInput('');
       await fetchLockers();
       await playChime();
@@ -673,27 +675,53 @@ function LockerGrid({
         const hasStoredPackage = locker.status === 'occupied';
         const animation = lockerAnimations[locker.id];
         const manualPackage = manualPackageLockers[locker.id] ?? false;
-        const showActivePackage =
-          isOpen && (hasStoredPackage || Boolean(animation) || manualPackage);
-        const packageAnimationClass = animation ? 'animate-package-in' : '';
-        const packageKey =
-          animation?.key ??
-          (manualPackage ? `manual-${locker.id}` : hasStoredPackage ? 'stored' : 'empty');
         const interiorScale = INTERIOR_SCALE[locker.size];
-        const interiorStyle: CSSProperties = {
-          width: `${interiorScale * 100}%`,
-          height: `${interiorScale * 100}%`,
-        };
         const packageWidthScale = PACKAGE_SCALE[locker.size];
         const packageHeightScale = PACKAGE_SCALE[locker.size] * 0.72;
         const packageStyle: CSSProperties = {
           width: `${packageWidthScale * 100}%`,
           height: `${packageHeightScale * 100}%`,
         };
-        const doorBackground =
-          'linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(226, 255, 244, 0.7))';
-        const doorShadow = '0 3px 8px rgba(0, 0, 0, 0.12)';
-        const packageOverlayOpacity = isOpen ? 1 : 0.5;
+        const animationDirection = animation?.direction;
+        const isAnimating = Boolean(animation);
+        const packageAnimationClass =
+          animationDirection === 'incoming'
+            ? 'animate-package-in'
+            : animationDirection === 'outgoing'
+              ? 'animate-package-out'
+              : '';
+        const packageKey =
+          animation?.key ??
+          (manualPackage ? `manual-${locker.id}` : hasStoredPackage ? 'stored' : 'empty');
+        const packageOpacity =
+          !isOpen && !isAnimating && hasStoredPackage ? 0.55 : 1;
+        const package3dStyle: CSSProperties = {
+          ...packageStyle,
+          opacity: packageOpacity,
+          transformStyle: 'preserve-3d',
+        };
+        const doorRotation = isOpen ? -100 : 0;
+        const doorStyle: CSSProperties = {
+          transformStyle: 'preserve-3d',
+          transform: `rotateY(${doorRotation}deg)`,
+          transformOrigin: 'left center',
+          transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+          background: isOpen
+            ? 'linear-gradient(135deg, #a7f1c4, #69d59f)'
+            : 'linear-gradient(135deg, rgba(167, 241, 196, 0.96), rgba(95, 207, 146, 0.88))',
+          border: '1px solid rgba(18, 114, 94, 0.55)',
+          boxShadow: isOpen
+            ? '12px 6px 22px rgba(0, 0, 0, 0.2)'
+            : '0 5px 14px rgba(0, 0, 0, 0.18)',
+        };
+        const cabinetStyle: CSSProperties = {
+          width: `${interiorScale * 100}%`,
+          height: `${interiorScale * 100}%`,
+          perspective: '1100px',
+          transformStyle: 'preserve-3d',
+        };
+        const shouldRenderPackage =
+          hasStoredPackage || manualPackage || isAnimating;
 
         return (
           <button
@@ -701,51 +729,35 @@ function LockerGrid({
             className="relative rounded-lg border-2 border-emerald-600 bg-emerald-300 focus:outline-none focus:ring-4 focus:ring-emerald-400/60 overflow-hidden transition-transform hover:scale-[1.01]"
             onClick={() => onSelectLocker(locker.id)}
           >
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div
-                className="relative flex items-center justify-center"
-                style={interiorStyle}
-              >
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="relative flex items-center justify-center" style={cabinetStyle}>
                 <div className="absolute inset-0 rounded-lg border border-emerald-500/45 bg-gradient-to-br from-white/75 to-emerald-100/60 shadow-inner" />
-                {showActivePackage && (
+                {shouldRenderPackage && (
                   <div
                     key={packageKey}
                     className={`relative z-20 flex items-center justify-center rounded-sm border border-amber-500/70 bg-amber-300 shadow-md shadow-amber-700/30 ${packageAnimationClass}`}
-                    style={{ ...packageStyle, opacity: packageOverlayOpacity }}
+                    style={package3dStyle}
                   >
                     <div className="absolute inset-0 rounded-[3px] border border-white/40 opacity-60" />
                     <div className="absolute inset-x-1 top-[34%] h-[30%] rounded-[2px] bg-amber-500/75" />
                   </div>
                 )}
-              </div>
-            </div>
-
-            <div
-              className="absolute inset-0 rounded-lg origin-left transition-transform duration-500 ease-in-out"
-              style={{
-                transform: isOpen ? 'scaleX(0)' : 'scaleX(1)',
-                background: doorBackground,
-                border: '1px solid rgba(18, 114, 94, 0.55)',
-                boxShadow: doorShadow,
-              }}
-            />
-
-            {hasStoredPackage && !isOpen && (
-              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
                 <div
-                  className="relative flex items-center justify-center"
-                  style={interiorStyle}
+                  className="absolute inset-0 rounded-md"
+                  style={doorStyle}
                 >
+                  <div className="absolute inset-0 rounded-md bg-gradient-to-br from-emerald-200 via-emerald-100 to-emerald-50" />
                   <div
-                    className="relative flex items-center justify-center rounded-sm border border-amber-500/60 bg-amber-300/80 shadow-md shadow-amber-700/20"
-                    style={{ ...packageStyle, opacity: 0.55 }}
-                  >
-                    <div className="absolute inset-0 rounded-[3px] border border-white/40 opacity-45" />
-                    <div className="absolute inset-x-1 top-[34%] h-[30%] rounded-[2px] bg-amber-500/60" />
-                  </div>
+                    className="absolute inset-0 rounded-md bg-emerald-200/35"
+                    style={{ transform: 'translateZ(-2px)' }}
+                  />
+                  <div
+                    className="absolute inset-y-0 left-0 w-[3px] bg-emerald-700/45"
+                    style={{ transform: 'translateZ(1.4px)' }}
+                  />
                 </div>
               </div>
-            )}
+            </div>
 
             <div className="relative z-40 flex h-full w-full flex-col px-1 pb-1 pt-1.5 text-emerald-900">
               <span className="text-[10px] font-semibold opacity-80">
