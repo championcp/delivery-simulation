@@ -59,6 +59,7 @@ if not exist "%NEXT_BIN%" (
   pause
   exit /b 1
 )
+set "PATH=%NODE_DIR%;%NODE_DIR%\node_modules\npm\bin;%PATH%"
 cd /d "%APP_DIR%"
 if not exist data mkdir data
 if "%PORT%"=="" (
