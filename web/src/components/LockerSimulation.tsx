@@ -778,12 +778,13 @@ function LockerGrid({
         let shouldRenderPackage =
           hasStoredPackage || manualPackage || isAnimating;
         if (pendingAction === 'incoming' && !manualPackage && !isAnimating) {
+          shouldRenderPackage = true;
+        }
+        if (pendingAction === 'outgoing' && !manualPackage && !isAnimating) {
           shouldRenderPackage = false;
         }
-        if (pendingAction === 'outgoing') {
-          shouldRenderPackage = manualPackage || isAnimating;
-        }
-        const canInteractWithPackage = Boolean(pendingAction) && isOpen;
+        const canInteractWithPackage =
+          Boolean(pendingAction) && isOpen;
         const packageOpacity =
           !isOpen && !isAnimating && hasStoredPackage ? 0.55 : 1;
         const package3dStyle: CSSProperties = {
