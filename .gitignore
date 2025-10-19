@@ -15,6 +15,10 @@
 # production
 /build
 
+# packaging artifacts
+/dist
+/.tmp
+
 # misc
 .DS_Store
 *.pem
