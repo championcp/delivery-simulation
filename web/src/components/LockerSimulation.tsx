@@ -80,6 +80,9 @@ export default function LockerSimulation() {
   const [manualPackageLockers, setManualPackageLockers] = useState<
     Record<number, boolean>
   >({});
+  const [pendingActions, setPendingActions] = useState<
+    Record<number, LockerAnimation['direction']>
+  >({});
 
   const fetchLockers = useCallback(async () => {
     try {
@@ -148,6 +151,17 @@ export default function LockerSimulation() {
     oscillator.stop(context.currentTime + 0.6);
   }, [ensureAudioContext]);
 
+  const speak = useCallback((message: string) => {
+    if (typeof window === 'undefined') return;
+    if (!('speechSynthesis' in window)) return;
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = 'zh-CN';
+    synth.cancel();
+    synth.speak(utterance);
+  }, []);
+
   const triggerPackageAnimation = useCallback(
     (lockerId: number, direction: LockerAnimation['direction']) => {
       const key = Date.now() + Math.random();
@@ -204,9 +218,18 @@ export default function LockerSimulation() {
       });
       setMessage(data.instructions);
       setOpenLockerId(data.locker.id);
-      triggerPackageAnimation(data.locker.id, 'incoming');
+      setPendingActions((prev) => ({
+        ...prev,
+        [data.locker.id]: 'incoming',
+      }));
+      setManualPackageLockers((prev) => {
+        const copy = { ...prev };
+        delete copy[data.locker.id];
+        return copy;
+      });
       await fetchLockers();
       await playChime();
+      speak('柜门已打开，请放入您的包裹，然后关闭柜门');
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : '投件失败，请稍后再试');
@@ -251,10 +274,14 @@ export default function LockerSimulation() {
         ...prev,
         [data.locker.id]: true,
       }));
-      triggerPackageAnimation(data.locker.id, 'outgoing');
+      setPendingActions((prev) => ({
+        ...prev,
+        [data.locker.id]: 'outgoing',
+      }));
       setPickupInput('');
       await fetchLockers();
       await playChime();
+      speak('柜门已打开，请取走您的包裹，然后关闭柜门');
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : '取件失败，请稍后重试');
@@ -276,6 +303,7 @@ export default function LockerSimulation() {
     animationTimeoutsRef.current = {};
     setLockerAnimations({});
     setManualPackageLockers({});
+    setPendingActions({});
   };
 
   const handleDoorClosed = async () => {
@@ -297,6 +325,12 @@ export default function LockerSimulation() {
         delete copy[closingLockerId];
         return copy;
       });
+      setPendingActions((prev) => {
+        if (!prev[closingLockerId]) return prev;
+        const copy = { ...prev };
+        delete copy[closingLockerId];
+        return copy;
+      });
     }
     setOpenLockerId(null);
     setMessage('柜门已关闭，欢迎再次使用！');
@@ -307,6 +341,40 @@ export default function LockerSimulation() {
   };
 
   const keypadNumbers = useMemo(() => ['1', '2', '3', '4', '5', '6', '7', '8', '9', '清空', '0', '删除'], []);
+  const handlePackageInteract = useCallback(
+    (lockerId: number) => {
+      const action = pendingActions[lockerId];
+      if (!action) return;
+      if (action === 'incoming') {
+        setManualPackageLockers((prev) => ({
+          ...prev,
+          [lockerId]: true,
+        }));
+        triggerPackageAnimation(lockerId, 'incoming');
+        setPendingActions((prev) => {
+          const copy = { ...prev };
+          delete copy[lockerId];
+          return copy;
+        });
+      } else {
+        triggerPackageAnimation(lockerId, 'outgoing');
+        setPendingActions((prev) => {
+          const copy = { ...prev };
+          delete copy[lockerId];
+          return copy;
+        });
+        window.setTimeout(() => {
+          setManualPackageLockers((prev) => {
+            if (!prev[lockerId]) return prev;
+            const copy = { ...prev };
+            delete copy[lockerId];
+            return copy;
+          });
+        }, 750);
+      }
+    },
+    [pendingActions, triggerPackageAnimation],
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-emerald-50 to-emerald-100 flex flex-col items-center py-6 px-4">
@@ -326,6 +394,8 @@ export default function LockerSimulation() {
               openLockerId={openLockerId}
               lockerAnimations={lockerAnimations}
               manualPackageLockers={manualPackageLockers}
+              pendingActions={pendingActions}
+              onPackageAction={handlePackageInteract}
               onSelectLocker={(lockerId) => {
                 const locker = lockers.find((item) => item.id === lockerId);
                 if (locker) {
@@ -342,19 +412,22 @@ export default function LockerSimulation() {
             />
 
             <div className="flex-1 overflow-y-auto pr-1 pb-3">
-              <ScreenContent
-                screen={screen}
-                courierForm={courierForm}
-                onCourierFormChange={setCourierForm}
-                pickupInput={pickupInput}
-                onCourierSubmit={handleCourierSubmit}
-                onPickupConfirm={handlePickupConfirm}
-                onShowCourier={() => setScreen({ view: 'courierForm' })}
-                onShowPickup={() => setScreen({ view: 'pickupForm' })}
-                onCloseDoor={handleDoorClosed}
-                onBackHome={resetToHome}
-                keypadNumbers={keypadNumbers}
-                onKeypadClick={(value) => {
+            <ScreenContent
+              screen={screen}
+              courierForm={courierForm}
+              onCourierFormChange={setCourierForm}
+              pickupInput={pickupInput}
+              onCourierSubmit={handleCourierSubmit}
+              onPickupConfirm={handlePickupConfirm}
+              onShowCourier={() => setScreen({ view: 'courierForm' })}
+              onShowPickup={() => setScreen({ view: 'pickupForm' })}
+              onCloseDoor={handleDoorClosed}
+              onBackHome={resetToHome}
+              disableClose={Boolean(
+                openLockerId != null && pendingActions[openLockerId],
+              )}
+              keypadNumbers={keypadNumbers}
+              onKeypadClick={(value) => {
                   if (value === '清空') {
                     setPickupInput('');
                   } else if (value === '删除') {
@@ -426,6 +499,7 @@ function ScreenContent(props: {
   onShowPickup: () => void;
   onCloseDoor: () => void;
   onBackHome: () => void;
+  disableClose: boolean;
   keypadNumbers: string[];
   onKeypadClick: (value: string) => void;
 }) {
@@ -440,6 +514,7 @@ function ScreenContent(props: {
     onShowPickup,
     onCloseDoor,
     onBackHome,
+    disableClose,
     keypadNumbers,
     onKeypadClick,
   } = props;
@@ -561,6 +636,7 @@ function ScreenContent(props: {
         <button
           className="mt-auto bg-emerald-400 hover:bg-emerald-300 text-slate-900 rounded-lg py-2 font-semibold"
           onClick={onCloseDoor}
+          disabled={disableClose}
         >
           已放入包裹，关闭柜门
         </button>
@@ -627,6 +703,7 @@ function ScreenContent(props: {
         <button
           className="mt-auto bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-lg py-2 font-semibold"
           onClick={onCloseDoor}
+          disabled={disableClose}
         >
           已取出包裹，关闭柜门
         </button>
@@ -652,12 +729,16 @@ function LockerGrid({
   openLockerId,
   lockerAnimations,
   manualPackageLockers,
+  pendingActions,
+  onPackageAction,
   onSelectLocker,
 }: {
   lockers: Locker[];
   openLockerId: number | null;
   lockerAnimations: Record<number, LockerAnimation>;
   manualPackageLockers: Record<number, boolean>;
+  pendingActions: Record<number, LockerAnimation['direction']>;
+  onPackageAction: (lockerId: number) => void;
   onSelectLocker: (lockerId: number) => void;
 }) {
   if (!lockers.length) {
@@ -675,6 +756,7 @@ function LockerGrid({
         const hasStoredPackage = locker.status === 'occupied';
         const animation = lockerAnimations[locker.id];
         const manualPackage = manualPackageLockers[locker.id] ?? false;
+        const pendingAction = pendingActions[locker.id];
         const interiorScale = INTERIOR_SCALE[locker.size];
         const packageWidthScale = PACKAGE_SCALE[locker.size];
         const packageHeightScale = PACKAGE_SCALE[locker.size] * 0.72;
@@ -693,6 +775,15 @@ function LockerGrid({
         const packageKey =
           animation?.key ??
           (manualPackage ? `manual-${locker.id}` : hasStoredPackage ? 'stored' : 'empty');
+        let shouldRenderPackage =
+          hasStoredPackage || manualPackage || isAnimating;
+        if (pendingAction === 'incoming' && !manualPackage && !isAnimating) {
+          shouldRenderPackage = false;
+        }
+        if (pendingAction === 'outgoing') {
+          shouldRenderPackage = manualPackage || isAnimating;
+        }
+        const canInteractWithPackage = Boolean(pendingAction) && isOpen;
         const packageOpacity =
           !isOpen && !isAnimating && hasStoredPackage ? 0.55 : 1;
         const package3dStyle: CSSProperties = {
@@ -720,32 +811,40 @@ function LockerGrid({
           perspective: '1100px',
           transformStyle: 'preserve-3d',
         };
-        const shouldRenderPackage =
-          hasStoredPackage || manualPackage || isAnimating;
-
         return (
           <button
             key={locker.id}
             className="relative rounded-lg border-2 border-emerald-600 bg-emerald-300 focus:outline-none focus:ring-4 focus:ring-emerald-400/60 overflow-hidden transition-transform hover:scale-[1.01]"
             onClick={() => onSelectLocker(locker.id)}
           >
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative flex items-center justify-center" style={cabinetStyle}>
                 <div className="absolute inset-0 rounded-lg border border-emerald-500/45 bg-gradient-to-br from-white/75 to-emerald-100/60 shadow-inner" />
                 {shouldRenderPackage && (
-                  <div
+                  <button
                     key={packageKey}
-                    className={`relative z-20 flex items-center justify-center rounded-sm border border-amber-500/70 bg-amber-300 shadow-md shadow-amber-700/30 ${packageAnimationClass}`}
+                    type="button"
+                    className={`relative z-20 flex items-center justify-center rounded-sm border border-amber-500/70 bg-amber-300 shadow-md shadow-amber-700/30 transition-transform ${packageAnimationClass} ${canInteractWithPackage ? 'pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 hover:shadow-[0_0_18px_rgba(255,191,0,0.55)]' : 'pointer-events-none'}`}
                     style={package3dStyle}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (canInteractWithPackage) {
+                        onPackageAction(locker.id);
+                      }
+                    }}
+                    disabled={!canInteractWithPackage}
+                    aria-label={pendingAction === 'incoming' ? '点击放入包裹' : pendingAction === 'outgoing' ? '点击取出包裹' : '包裹'}
                   >
                     <div className="absolute inset-0 rounded-[3px] border border-white/40 opacity-60" />
                     <div className="absolute inset-x-1 top-[34%] h-[30%] rounded-[2px] bg-amber-500/75" />
-                  </div>
+                    {canInteractWithPackage && (
+                      <span className="absolute bottom-[-18px] rounded bg-amber-400 px-1 py-[1px] text-[10px] font-bold text-emerald-900 shadow-sm">
+                        {pendingAction === 'incoming' ? '点击放入' : '点击取出'}
+                      </span>
+                    )}
+                  </button>
                 )}
-                <div
-                  className="absolute inset-0 rounded-md"
-                  style={doorStyle}
-                >
+                <div className="pointer-events-none absolute inset-0 rounded-md" style={doorStyle}>
                   <div className="absolute inset-0 rounded-md bg-gradient-to-br from-emerald-200 via-emerald-100 to-emerald-50" />
                   <div
                     className="absolute inset-0 rounded-md bg-emerald-200/35"
