@@ -83,6 +83,42 @@ export default function LockerSimulation() {
   const [pendingActions, setPendingActions] = useState<
     Record<number, LockerAnimation['direction']>
   >({});
+  const logDebug = useCallback((label: string, payload?: unknown) => {
+    if (typeof window === 'undefined') return;
+    if (payload === undefined) {
+      console.log(`[LockerSimulation] ${label}`);
+      return;
+    }
+    try {
+      const serializable =
+        typeof payload === 'string'
+          ? payload
+          : JSON.parse(JSON.stringify(payload, (_key, value) => {
+              if (value instanceof Map) {
+                return {
+                  __type: 'Map',
+                  entries: Array.from(value.entries()),
+                };
+              }
+              if (value instanceof Set) {
+                return {
+                  __type: 'Set',
+                  values: Array.from(value.values()),
+                };
+              }
+              if (typeof value === 'bigint') {
+                return value.toString();
+              }
+              if (typeof value === 'number' && !Number.isFinite(value)) {
+                return String(value);
+              }
+              return value;
+            }));
+      console.log(`[LockerSimulation] ${label}`, serializable);
+    } catch {
+      console.log(`[LockerSimulation] ${label}`, payload);
+    }
+  }, []);
 
   const fetchLockers = useCallback(async () => {
     try {
@@ -101,6 +137,33 @@ export default function LockerSimulation() {
   useEffect(() => {
     fetchLockers();
   }, [fetchLockers]);
+
+  useEffect(() => {
+    logDebug('state.snapshot', {
+      openLockerId,
+      pendingActions,
+      manualPackageLockers,
+      lockerAnimations: Object.keys(lockerAnimations),
+      message,
+      error,
+    });
+  }, [
+    error,
+    logDebug,
+    lockerAnimations,
+    manualPackageLockers,
+    message,
+    openLockerId,
+    pendingActions,
+  ]);
+
+  useEffect(() => {
+    logDebug('state.pendingActions.changed', pendingActions);
+  }, [logDebug, pendingActions]);
+
+  useEffect(() => {
+    logDebug('state.manualPackageLockers.changed', manualPackageLockers);
+  }, [logDebug, manualPackageLockers]);
 
   useEffect(() => {
     return () => {
@@ -190,9 +253,16 @@ export default function LockerSimulation() {
   );
 
   const handleCourierSubmit = async () => {
+    logDebug('courier.submit.start', {
+      courierForm,
+      openLockerId,
+      pendingActions,
+      manualPackageLockers,
+    });
     setLoading(true);
     setError(null);
     setMessage(null);
+    let assignedLockerId: number | null = null;
     try {
       const res = await fetch('/api/courier/deliver', {
         method: 'POST',
@@ -208,6 +278,7 @@ export default function LockerSimulation() {
         pickupCode: string;
         instructions: string;
       } = await res.json();
+      assignedLockerId = data.locker.id;
       setScreen({
         view: 'courierSuccess',
         data: {
@@ -230,11 +301,23 @@ export default function LockerSimulation() {
       await fetchLockers();
       await playChime();
       speak('柜门已打开，请放入您的包裹，然后关闭柜门');
+      logDebug('courier.submit.success', {
+        assignedLockerId,
+        pendingActionsAfterSet: {
+          ...pendingActions,
+          [data.locker.id]: 'incoming',
+        },
+      });
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : '投件失败，请稍后再试');
     } finally {
       setLoading(false);
+      logDebug('courier.submit.finished', {
+        assignedLockerId,
+        openLockerId: assignedLockerId ?? openLockerId,
+        pendingActionsSnapshot: pendingActions,
+      });
     }
   };
 
@@ -243,9 +326,16 @@ export default function LockerSimulation() {
       setError('请输入 6 位取件码');
       return;
     }
+    logDebug('pickup.confirm.start', {
+      pickupInput,
+      openLockerId,
+      pendingActions,
+      manualPackageLockers,
+    });
     setLoading(true);
     setError(null);
     setMessage(null);
+    let pickupLockerId: number | null = null;
     try {
       const res = await fetch('/api/user/pickup', {
         method: 'POST',
@@ -260,6 +350,7 @@ export default function LockerSimulation() {
         locker: Locker;
         message: string;
       } = await res.json();
+      pickupLockerId = data.locker.id;
       setScreen({
         view: 'pickupSuccess',
         data: {
@@ -282,11 +373,23 @@ export default function LockerSimulation() {
       await fetchLockers();
       await playChime();
       speak('柜门已打开，请取走您的包裹，然后关闭柜门');
+      logDebug('pickup.confirm.success', {
+        pickupLockerId,
+        pendingActionsAfterSet: {
+          ...pendingActions,
+          [data.locker.id]: 'outgoing',
+        },
+      });
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : '取件失败，请稍后重试');
     } finally {
       setLoading(false);
+      logDebug('pickup.confirm.finished', {
+        pickupLockerId,
+        openLockerId: pickupLockerId ?? openLockerId,
+        pendingActionsSnapshot: pendingActions,
+      });
     }
   };
 
@@ -308,6 +411,11 @@ export default function LockerSimulation() {
 
   const handleDoorClosed = async () => {
     const closingLockerId = openLockerId;
+    console.log('[LockerSimulation] handleDoorClosed click', {
+      closingLockerId,
+      pendingActions,
+      manualPackageLockers,
+    });
     if (closingLockerId != null) {
       if (animationTimeoutsRef.current[closingLockerId]) {
         window.clearTimeout(animationTimeoutsRef.current[closingLockerId]);
@@ -329,6 +437,7 @@ export default function LockerSimulation() {
         if (!prev[closingLockerId]) return prev;
         const copy = { ...prev };
         delete copy[closingLockerId];
+        console.log('[LockerSimulation] pendingActions after handleDoorClosed', copy);
         return copy;
       });
     }
@@ -341,26 +450,56 @@ export default function LockerSimulation() {
   };
 
   const keypadNumbers = useMemo(() => ['1', '2', '3', '4', '5', '6', '7', '8', '9', '清空', '0', '删除'], []);
+  const disableClose = useMemo(
+    () => Boolean(openLockerId != null && pendingActions[openLockerId]),
+    [openLockerId, pendingActions],
+  );
+  useEffect(() => {
+    logDebug('ui.buttons.disableClose', {
+      disableClose,
+      openLockerId,
+      pendingActions,
+    });
+  }, [disableClose, logDebug, openLockerId, pendingActions]);
   const handlePackageInteract = useCallback(
     (lockerId: number) => {
       const action = pendingActions[lockerId];
+      console.log('[LockerSimulation] handlePackageInteract', {
+        lockerId,
+        action,
+        pendingActions,
+      });
       if (!action) return;
       if (action === 'incoming') {
         setManualPackageLockers((prev) => ({
           ...prev,
           [lockerId]: true,
         }));
+        logDebug('handlePackageInteract.incoming.start', {
+          lockerId,
+          action,
+          pendingActions,
+          manualPackageLockers,
+        });
         triggerPackageAnimation(lockerId, 'incoming');
         setPendingActions((prev) => {
           const copy = { ...prev };
           delete copy[lockerId];
+          logDebug('handlePackageInteract.incoming.afterPending', copy);
           return copy;
         });
       } else {
+        logDebug('handlePackageInteract.outgoing.start', {
+          lockerId,
+          action,
+          pendingActions,
+          manualPackageLockers,
+        });
         triggerPackageAnimation(lockerId, 'outgoing');
         setPendingActions((prev) => {
           const copy = { ...prev };
           delete copy[lockerId];
+          logDebug('handlePackageInteract.outgoing.afterPending', copy);
           return copy;
         });
         window.setTimeout(() => {
@@ -368,12 +507,16 @@ export default function LockerSimulation() {
             if (!prev[lockerId]) return prev;
             const copy = { ...prev };
             delete copy[lockerId];
+            logDebug('handlePackageInteract.outgoing.manualCleared', {
+              lockerId,
+              nextManual: copy,
+            });
             return copy;
           });
         }, 750);
       }
     },
-    [pendingActions, triggerPackageAnimation],
+    [logDebug, manualPackageLockers, pendingActions, triggerPackageAnimation],
   );
 
   return (
@@ -395,6 +538,7 @@ export default function LockerSimulation() {
               lockerAnimations={lockerAnimations}
               manualPackageLockers={manualPackageLockers}
               pendingActions={pendingActions}
+              logDebug={logDebug}
               onPackageAction={handlePackageInteract}
               onSelectLocker={(lockerId) => {
                 const locker = lockers.find((item) => item.id === lockerId);
@@ -423,9 +567,7 @@ export default function LockerSimulation() {
               onShowPickup={() => setScreen({ view: 'pickupForm' })}
               onCloseDoor={handleDoorClosed}
               onBackHome={resetToHome}
-              disableClose={Boolean(
-                openLockerId != null && pendingActions[openLockerId],
-              )}
+              disableClose={disableClose}
               keypadNumbers={keypadNumbers}
               onKeypadClick={(value) => {
                   if (value === '清空') {
@@ -730,6 +872,7 @@ function LockerGrid({
   lockerAnimations,
   manualPackageLockers,
   pendingActions,
+  logDebug,
   onPackageAction,
   onSelectLocker,
 }: {
@@ -738,6 +881,7 @@ function LockerGrid({
   lockerAnimations: Record<number, LockerAnimation>;
   manualPackageLockers: Record<number, boolean>;
   pendingActions: Record<number, LockerAnimation['direction']>;
+  logDebug: (label: string, payload?: unknown) => void;
   onPackageAction: (lockerId: number) => void;
   onSelectLocker: (lockerId: number) => void;
 }) {
@@ -792,6 +936,36 @@ function LockerGrid({
           opacity: packageOpacity,
           transformStyle: 'preserve-3d',
         };
+        if (typeof window !== 'undefined') {
+          try {
+            console.log(
+              '[LockerGrid] locker render',
+              JSON.parse(
+                JSON.stringify({
+                  lockerId: locker.id,
+                  isOpen,
+                  pendingAction,
+                  hasStoredPackage,
+                  manualPackage,
+                  isAnimating,
+                  canInteractWithPackage,
+                  shouldRenderPackage,
+                }),
+              ),
+            );
+          } catch {
+            console.log('[LockerGrid] locker render (raw)', {
+              lockerId: locker.id,
+              isOpen,
+              pendingAction,
+              hasStoredPackage,
+              manualPackage,
+              isAnimating,
+              canInteractWithPackage,
+              shouldRenderPackage,
+            });
+          }
+        }
         const doorRotation = isOpen ? -100 : 0;
         const doorStyle: CSSProperties = {
           transformStyle: 'preserve-3d',
@@ -813,10 +987,46 @@ function LockerGrid({
           transformStyle: 'preserve-3d',
         };
         return (
-          <button
+          <div
             key={locker.id}
-            className="relative rounded-lg border-2 border-emerald-600 bg-emerald-300 focus:outline-none focus:ring-4 focus:ring-emerald-400/60 overflow-hidden transition-transform hover:scale-[1.01]"
-            onClick={() => onSelectLocker(locker.id)}
+            role="button"
+            tabIndex={0}
+            className="relative rounded-lg border-2 border-emerald-600 bg-emerald-300 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-400/60 overflow-hidden transition-transform hover:scale-[1.01]"
+            onClick={(event) => {
+              if (canInteractWithPackage) {
+                logDebug('lockerGrid.cell.clickHandlesPackage', {
+                  lockerId: locker.id,
+                  pendingAction,
+                  isOpen,
+                });
+                event.preventDefault();
+                onPackageAction(locker.id);
+                return;
+              }
+              logDebug('lockerGrid.cell.selectLocker', {
+                lockerId: locker.id,
+                isOpen,
+                pendingAction,
+              });
+              onSelectLocker(locker.id);
+            }}
+            onPointerDown={(event) => {
+              logDebug('lockerGrid.cell.pointerDown', {
+                lockerId: locker.id,
+                isOpen,
+                pendingAction,
+              });
+              if (canInteractWithPackage) {
+                event.preventDefault();
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onSelectLocker(locker.id);
+              }
+            }}
+            aria-pressed={isOpen}
           >
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative flex items-center justify-center" style={cabinetStyle}>
@@ -825,16 +1035,37 @@ function LockerGrid({
                   <button
                     key={packageKey}
                     type="button"
-                    className={`relative z-20 flex items-center justify-center rounded-sm border border-amber-500/70 bg-amber-300 shadow-md shadow-amber-700/30 transition-transform ${packageAnimationClass} ${canInteractWithPackage ? 'pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 hover:shadow-[0_0_18px_rgba(255,191,0,0.55)]' : 'pointer-events-none'}`}
+                    className={`relative z-20 flex items-center justify-center rounded-sm border border-amber-500/70 bg-amber-300 shadow-md shadow-amber-700/30 transition-transform ${packageAnimationClass} ${canInteractWithPackage ? 'pointer-events-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 hover:shadow-[0_0_18px_rgba(255,191,0,0.55)] cursor-pointer' : 'pointer-events-none cursor-default'}`}
                     style={package3dStyle}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      logDebug('lockerGrid.package.pointerDown', {
+                        lockerId: locker.id,
+                        pendingAction,
+                        canInteractWithPackage,
+                        isOpen,
+                      });
+                    }}
                     onClick={(event) => {
                       event.stopPropagation();
+                      logDebug('lockerGrid.package.click', {
+                        lockerId: locker.id,
+                        pendingAction,
+                        canInteractWithPackage,
+                        isOpen,
+                      });
                       if (canInteractWithPackage) {
                         onPackageAction(locker.id);
                       }
                     }}
                     disabled={!canInteractWithPackage}
-                    aria-label={pendingAction === 'incoming' ? '点击放入包裹' : pendingAction === 'outgoing' ? '点击取出包裹' : '包裹'}
+                    aria-label={
+                      pendingAction === 'incoming'
+                        ? '点击放入包裹'
+                        : pendingAction === 'outgoing'
+                          ? '点击取出包裹'
+                          : '包裹'
+                    }
                   >
                     <div className="absolute inset-0 rounded-[3px] border border-white/40 opacity-60" />
                     <div className="absolute inset-x-1 top-[34%] h-[30%] rounded-[2px] bg-amber-500/75" />
@@ -872,7 +1103,7 @@ function LockerGrid({
                     : '大格'}
               </span>
             </div>
-          </button>
+          </div>
         );
       })}
     </div>
